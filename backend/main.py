@@ -265,21 +265,28 @@ def get_prompts(session: Session = Depends(get_session)):
                 all_positions.append(wix_position)
             all_mentions_count.append(len(mentioned_brands))
 
-        # Get brand data from latest run for display
-        latest_mentions = session.exec(
-            select(PromptBrandMention).where(PromptBrandMention.prompt_id == latest_prompt.id)
-        ).all()
+        # Aggregate mentioned brands across ALL runs (not just latest)
+        all_mentioned_brand_ids = set()
+        for prompt in prompts_list:
+            mentions = session.exec(
+                select(PromptBrandMention).where(
+                    PromptBrandMention.prompt_id == prompt.id,
+                    PromptBrandMention.mentioned == True
+                )
+            ).all()
+            for m in mentions:
+                all_mentioned_brand_ids.add(m.brand_id)
 
-        latest_brand_responses = []
+        # Build aggregated brand responses (brand is "mentioned" if mentioned in ANY run)
+        aggregated_brand_responses = []
         for brand in brands:
-            mention = next((m for m in latest_mentions if m.brand_id == brand.id), None)
-            latest_brand_responses.append(
+            aggregated_brand_responses.append(
                 PromptBrandMentionResponse(
                     brandId=brand.id,
                     brandName=brand.name,
-                    position=mention.position if mention and mention.mentioned else 0,
-                    mentioned=mention.mentioned if mention else False,
-                    sentiment=mention.sentiment if mention and mention.sentiment else "neutral",
+                    position=0,  # Position varies by run, use 0 for aggregated view
+                    mentioned=brand.id in all_mentioned_brand_ids,
+                    sentiment="neutral",  # Aggregated sentiment
                 )
             )
 
@@ -296,7 +303,7 @@ def get_prompts(session: Session = Depends(get_session)):
                 avgPosition=round(avg_pos, 1),
                 totalMentions=round(avg_mentions),
                 totalRuns=len(prompts_list),
-                brands=latest_brand_responses,
+                brands=aggregated_brand_responses,
             )
         )
 
@@ -486,7 +493,7 @@ def get_metrics(session: Session = Depends(get_session)):
         visibility=MetricResponse(value=round(jan_visibility, 1), change=round(visibility_change, 1)),
         totalPrompts=MetricResponse(value=total_queries, change=0),
         totalSources=MetricResponse(value=jan_source_count, change=sources_change, total=total_source_count),
-        avgPosition=MetricResponse(value=round(jan_avg_position, 1), change=round(position_change, 1)),
+        avgPosition=MetricResponse(value=round(jan_avg_position, 1), change=round(position_change, 2)),
     )
 
 

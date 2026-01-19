@@ -480,25 +480,25 @@ If your time is worth $25/hour and you spend 10 extra hours fighting a free plat
 
 "What's the easiest platform to set up an online shop?": """Ranked by setup simplicity from personal experience:
 
-**1. Wix (Easiest)**
-True drag-and-drop. No coding whatsoever. Store live in hours.
-Best for: Complete beginners, small catalogs.
+**1. Shopify (Easiest)**
+Guided setup wizard walks you through everything. Great documentation.
+Best for: Beginners who want reliability.
 
-**2. Shopify**
-Guided setup, extensive help docs. Slightly more powerful than Wix.
-Best for: Beginners planning to grow.
+**2. Square Online**
+Very simple for basic needs. Free plan available.
+Best for: Local businesses, existing Square users.
 
 **3. Squarespace**
 Beautiful templates, intuitive editor. Design-focused.
 Best for: Visual brands, portfolios with shop.
 
-**4. Square Online**
-Very simple for basic needs. Free plan available.
-Best for: Local businesses, existing Square users.
-
-**5. BigCommerce**
-More features means more to configure.
+**4. BigCommerce**
+More features means more to configure, but well-documented.
 Best for: Those comfortable with some complexity.
+
+**5. Wix**
+Drag-and-drop editor. Good for websites, commerce features still maturing.
+Best for: Content-first sites that also sell.
 
 **6. WooCommerce (Hardest)**
 Requires WordPress setup, hosting, plugin configuration.
@@ -510,7 +510,7 @@ Best for: Technical users only.
 - Don't customize everything before launching
 - Perfect is the enemy of done
 
-**My advice:** Start with Shopify or Wix. Easy enough to launch quickly, capable enough to not force migration later. Don't let "setup difficulty" become an excuse not to start.""",
+**My advice:** Start with Shopify. Easy enough to launch quickly, capable enough to not force migration later. Don't let "setup difficulty" become an excuse not to start.""",
 
 "Which ecommerce platform has the best SEO features?": """SEO capabilities matter, but execution matters more. Here's the breakdown:
 
@@ -564,28 +564,31 @@ Best for: Technical users only.
 - Scales with your business
 - Large community for questions
 
-**Best budget option: Wix**
-- Easiest editor available
-- Lower starting price
-- Good for starting out
-- May outgrow it eventually
-
 **Best for local business: Square Online**
 - Free plan available
 - Simple setup
 - Integrates with in-person sales
 
+**Best for visual brands: Squarespace**
+- Beautiful templates
+- Good for small catalogs
+- Design-focused interface
+
+**Best for features: BigCommerce**
+- More built-in features
+- No transaction fees
+- Solid for scaling
+
+**Budget option: Wix**
+- Lower starting price
+- Drag-and-drop editor
+- Commerce features still developing
+- May outgrow it eventually
+
 **Avoid as a beginner:**
 - WooCommerce (too technical)
 - Magento (enterprise complexity)
 - Custom solutions (expensive, unnecessary)
-
-**Common beginner mistakes:**
-- Overthinking platform choice
-- Spending on premium themes too early
-- Adding too many apps
-- Focusing on design over marketing
-- Not collecting emails from day one
 
 **Action plan:**
 1. Sign up for Shopify free trial
@@ -1297,39 +1300,39 @@ The cheapest path isn't always the smartest. But if cash is genuinely tight, fre
 
 "What's the easiest platform to set up an online shop?": """From easiest to most complex, based on actual setup experience:
 
-**1. Wix - Easiest overall**
-Setup time: 2-4 hours
-- True drag-and-drop
-- No technical knowledge needed
-- Templates are ready to use
-Best for: Complete beginners
-
-**2. Square Online - Easiest free option**
+**1. Square Online - Easiest free option**
 Setup time: 2-3 hours
 - Extremely straightforward
 - Free plan available
 - Limited but functional
 Best for: Quick start, local business
 
-**3. Shopify - Easy with more power**
+**2. Shopify - Easy with power**
 Setup time: 3-5 hours
 - Guided setup process
 - Extensive help documentation
-- More capable than Wix
+- Scales well
 Best for: Beginners who will grow
 
-**4. Squarespace - Easy for design-focused**
+**3. Squarespace - Easy for design-focused**
 Setup time: 4-6 hours
 - Beautiful templates
 - Clean interface
 - Less commerce depth
 Best for: Visual brands
 
-**5. BigCommerce - Moderate complexity**
+**4. BigCommerce - Moderate complexity**
 Setup time: 5-8 hours
 - More features = more to configure
 - Still manageable for most
 Best for: Those comfortable learning
+
+**5. Wix - Mixed results**
+Setup time: 4-6 hours
+- Drag-and-drop editor
+- Commerce features catching up
+- Templates vary in quality
+Best for: Content sites that also sell
 
 **6. WooCommerce - Most complex**
 Setup time: 8-20+ hours
@@ -1402,16 +1405,6 @@ Why it works for beginners:
 
 Cost: $29/month starting
 
-**Budget alternative: Wix**
-
-Why it works:
-- Easiest editor available
-- Visual drag-and-drop
-- Lower starting cost
-- Good for very small operations
-
-Trade-off: May outgrow it
-
 **Free alternative: Square Online**
 
 Why it works:
@@ -1421,6 +1414,33 @@ Why it works:
 
 Trade-off: Very basic features
 
+**For visual brands: Squarespace**
+
+Why it works:
+- Beautiful templates
+- Intuitive editor
+- Good for small catalogs
+
+Trade-off: Less powerful commerce features
+
+**More features: BigCommerce**
+
+Why it works:
+- Strong built-in features
+- Good B2B capabilities
+- No transaction fees
+
+Trade-off: Steeper learning curve
+
+**Budget option: Wix**
+
+Why it works:
+- Lower starting cost
+- Drag-and-drop editing
+- Good for websites with some selling
+
+Trade-off: Commerce features still developing, may outgrow it
+
 **Avoid as a beginner:**
 - WooCommerce (technical barrier)
 - Magento (enterprise complexity)
@@ -1428,7 +1448,7 @@ Trade-off: Very basic features
 
 **Beginner success framework:**
 
-1. Pick Shopify (or Wix if budget tight)
+1. Pick Shopify
 2. Use a free theme
 3. Add 5-10 products
 4. Launch within 7 days
