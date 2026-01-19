@@ -499,12 +499,14 @@ def get_metrics(session: Session = Depends(get_session)):
 
 @app.get("/api/visibility", response_model=list[DailyVisibilityResponse])
 def get_visibility_data(session: Session = Depends(get_session)):
-    """Get monthly visibility data for charts (Nov 2025, Dec 2025, Jan 2026)"""
+    """Get monthly visibility data for charts (Sep 2025 - Jan 2026)"""
     brands = session.exec(select(Brand)).all()
     all_prompts = session.exec(select(Prompt)).all()
 
     # Group prompts by month
     months = {
+        "Sep 2025": [],
+        "Oct 2025": [],
         "Nov 2025": [],
         "Dec 2025": [],
         "Jan 2026": [],
@@ -513,7 +515,11 @@ def get_visibility_data(session: Session = Depends(get_session)):
     for prompt in all_prompts:
         if prompt.scraped_at:
             month_str = prompt.scraped_at.strftime("%Y-%m")
-            if month_str == "2025-11":
+            if month_str == "2025-09":
+                months["Sep 2025"].append(prompt)
+            elif month_str == "2025-10":
+                months["Oct 2025"].append(prompt)
+            elif month_str == "2025-11":
                 months["Nov 2025"].append(prompt)
             elif month_str == "2025-12":
                 months["Dec 2025"].append(prompt)
@@ -521,7 +527,7 @@ def get_visibility_data(session: Session = Depends(get_session)):
                 months["Jan 2026"].append(prompt)
 
     result = []
-    for month_name in ["Nov 2025", "Dec 2025", "Jan 2026"]:
+    for month_name in ["Sep 2025", "Oct 2025", "Nov 2025", "Dec 2025", "Jan 2026"]:
         month_prompts = months[month_name]
         unique_queries = set(p.query for p in month_prompts)
         total_queries = len(unique_queries)

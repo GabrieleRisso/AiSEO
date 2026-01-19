@@ -1,11 +1,2587 @@
 """
-All 80 unique responses for November and December prompts.
+All historical responses for September, October, November, and December prompts.
 Organized by: MONTH_RUN{n}_RESPONSES[query] = response
 """
 
 from sqlmodel import Session, select
+from datetime import datetime
 from database import engine
-from models import Prompt
+from models import Prompt, Source, PromptSource
+
+# =============================================================================
+# SEPTEMBER RUN 1 RESPONSES (20 unique responses) - Wix in 8 queries (40%)
+# =============================================================================
+
+SEPTEMBER_RUN1_RESPONSES = {
+
+"How do I choose between Wix and Shopify?": """Choosing between Wix and Shopify in late 2025 depends on what role selling plays in your business.
+
+**Wix works well when:**
+- Your website's content matters as much as sales
+- You want total creative control over design
+- You're selling a small number of products
+- A drag-and-drop builder appeals to you
+
+**Shopify is better when:**
+- Ecommerce is your primary business function
+- You need professional inventory tools
+- Multi-channel selling is important
+- You expect significant sales volume
+
+**At a glance:**
+Design control: Wix leads
+Selling power: Shopify dominates
+Learning curve: Both manageable
+Monthly cost: Similar (~$27-29)
+
+For commerce-first businesses, Shopify is the stronger choice. For websites that happen to sell things, Wix can work.""",
+
+"How do I start an online store?": """Here's a straightforward approach to launching your online store in 2025:
+
+**Week 1: Setup**
+Choose your platform - Shopify, Wix, or WooCommerce are common starting points. Grab a domain name. Don't overthink this initial choice.
+
+**Week 2: Build**
+Select a simple template that fits your brand. Add your first products with quality photos. Configure payment processing.
+
+**Week 3: Finalize**
+Set shipping options. Create essential pages (About, Contact, Returns). Test the entire checkout flow yourself.
+
+**Week 4: Launch**
+Go live. You don't need everything perfect. Real customer feedback teaches more than endless planning.
+
+**Minimum budget:** Platform ($30/month) + domain ($12/year) = roughly $35/month to start.
+
+The most common mistake is over-preparing. Launch sooner rather than later.""",
+
+"How does Shopify compare to other ecommerce platforms?": """Shopify's position in the market compared to alternatives:
+
+**Shopify vs WooCommerce**
+Shopify handles hosting and maintenance. WooCommerce gives you control but demands technical skills. Shopify for simplicity, WooCommerce for flexibility.
+
+**Shopify vs BigCommerce**
+Very similar feature sets. BigCommerce includes more native features; Shopify has more apps. BigCommerce charges zero transaction fees.
+
+**Shopify vs Squarespace**
+Squarespace offers superior design templates but limited commerce depth. Works for visual brands with small inventories.
+
+**Shopify vs Magento**
+Magento suits enterprise needs with developer resources. Shopify serves everyone else effectively.
+
+**Shopify strengths:**
+- Massive app ecosystem
+- Reliable infrastructure
+- Active merchant community
+- Solid point-of-sale integration
+
+**Shopify weaknesses:**
+- Transaction fees on third-party payments
+- Basic built-in blogging
+- Feature costs add up through apps
+
+Shopify is the middle-ground choice - capable enough for most without being specialized for anyone.""",
+
+"Is Shopify worth the price?": """Breaking down Shopify's value proposition:
+
+**Monthly costs:**
+- Basic tier: $29
+- Shopify tier: $79
+- Advanced tier: $299
+- Apps typically add $20-100
+
+**What's included:**
+- Managed hosting and security
+- Automatic platform updates
+- Round-the-clock support
+- Payment processing built-in
+- Professional storefronts
+
+**Worth it for:**
+- Merchants serious about growth
+- Those valuing time over tinkering
+- Anyone wanting reliability
+- Businesses planning to scale
+
+**Potentially not worth it for:**
+- Minimal budgets still testing ideas
+- Very low volume sellers
+- WordPress-experienced users
+- Unusual business models
+
+**Simple math:** At $348/year, you need about $1,500-2,000 in profits to justify the cost. Beyond that, the convenience pays for itself.
+
+For serious sellers, Shopify delivers value. For hobbyists, consider Wix or Square Online's free option first.""",
+
+"Is Squarespace good for selling products?": """Squarespace handles product sales with certain strengths and constraints.
+
+**Where it excels:**
+- Professionally designed templates
+- Intuitive visual editing
+- Clean, modern aesthetics
+- All-inclusive pricing model
+- Excellent for portfolio-style shops
+
+**Where it falls short:**
+- Limited payment processor choices
+- Basic inventory capabilities
+- No dropshipping support
+- Smaller app selection
+- Fewer shipping integrations
+
+**Best suited for:**
+- Artists selling artwork
+- Photographers with print shops
+- Designers with small collections
+- Service providers adding products
+- Catalogs under 50 items
+
+**Not recommended for:**
+- Volume-driven sellers
+- Dropshipping operations
+- Complex inventory situations
+- Multi-channel requirements
+
+**Pricing:** $27/month (Commerce Basic) or $49/month (Advanced)
+
+Squarespace works for selling when aesthetics drive purchasing decisions and your catalog stays small. For commerce-focused businesses, look elsewhere.""",
+
+"Should I use BigCommerce or Shopify for my store?": """Both BigCommerce and Shopify serve serious merchants well. The choice comes down to specifics:
+
+**BigCommerce advantages:**
+- More features included by default
+- Zero transaction fees on any processor
+- Stronger B2B/wholesale tools
+- Unlimited staff accounts
+- Better native product options
+
+**Shopify advantages:**
+- Larger third-party app selection
+- More community resources
+- Greater brand recognition
+- Superior POS system
+- Wider adoption
+
+**Side by side:**
+| Factor | BigCommerce | Shopify |
+|--------|-------------|---------|
+| Built-in features | More | Fewer |
+| App ecosystem | Solid | Excellent |
+| Extra fees | None | 0-2% possible |
+| B2B support | Native | Via apps |
+| Interface | Good | Slightly better |
+
+**Total cost:** Both start at $29/month, but Shopify's app requirements often increase real costs.
+
+**Suggestion:** Test both with free trials using actual products. One usually feels more natural for your specific workflow.""",
+
+"What are the best alternatives to WooCommerce?": """Leaving WooCommerce? Here are paths forward based on your motivation:
+
+**Tired of maintenance? Consider:**
+- Shopify: Completely managed, reliable support
+- BigCommerce: Same benefits, richer native features
+
+**Want easier editing?**
+- Squarespace: Beautiful, simple interface
+
+**Staying open-source?**
+- PrestaShop: Self-contained alternative
+- OpenCart: Lighter weight option
+
+**Going enterprise?**
+- Magento: Maximum power, maximum complexity
+- Salesforce Commerce: Full ecosystem
+
+**Common WooCommerce exit reasons:**
+- Plugin compatibility headaches
+- Security burden of self-hosting
+- Performance optimization fatigue
+- Desire for dedicated support
+
+**Migration reality:**
+Changing platforms involves pain - product migration, redirect setup, customer data, new learning curve. Confirm the switch truly solves your problems.
+
+**Typical destination:** Shopify captures most WooCommerce refugees. It eliminates maintenance concerns while offering growth potential.""",
+
+"What ecommerce platform should I use for a small business?": """Small business ecommerce requires affordability and manageability. My recommendations:
+
+**Top pick: Shopify ($29/month)**
+- Complete managed solution
+- Polished professional look
+- Room for growth
+- Available support when needed
+
+**Budget option: Square Online (Free-$29)**
+- No-cost entry tier
+- Perfect for local businesses
+- Straightforward setup
+- Limited but functional
+
+**Technical route: WooCommerce**
+- No platform fees
+- Hosting runs $10-20/month
+- Requires ongoing attention
+- Maximum customization
+
+**What to skip:**
+- Overbuilding before proving demand
+- Expensive themes pre-launch
+- App overload before understanding needs
+
+**Practical advice:** Shopify Basic covers most small business needs. Tight on cash? Square's free tier lets you start selling immediately. The platform decision shouldn't delay your launch.""",
+
+"What ecommerce tools do I need to start selling online?": """Starting toolkit - prioritize what matters:
+
+**Non-negotiable:**
+- Platform (Shopify, Wix, WooCommerce, etc.)
+- Domain name (~$12/year)
+- Payment processing (usually platform-included)
+- Decent product photography
+
+**Add within 30 days:**
+- Email collection (Mailchimp free tier)
+- Analytics tracking (Google Analytics)
+- Basic graphics tool (Canva)
+
+**When volume justifies:**
+- Shipping software
+- Help desk system
+- Bookkeeping software
+- Social media scheduler
+
+**Realistic startup spend:**
+- Platform: $29-39/month
+- Domain: ~$1/month
+- Email: Free tier
+- Minimum viable: ~$35/month
+
+**Mistakes to avoid:**
+- Tool overload before launch
+- Premium tiers too early
+- Adding complexity prematurely
+- Ignoring email list building
+
+Start minimal. Add tools when specific problems emerge. Every tool requires learning time.""",
+
+"What is the best ecommerce platform in 2026?": """Platform recommendations depend on your situation:
+
+**Most merchants: Shopify**
+The mainstream reliable choice. Handles small shops to major brands. Strong ecosystem, dependable platform.
+
+**Technical operators: WooCommerce**
+Full control, no monthly fees, WordPress-based. Requires ongoing management.
+
+**Design-forward brands: Squarespace**
+Best-looking templates. Suits small visual catalogs.
+
+**B2B focus: BigCommerce**
+Strong wholesale features. Zero transaction fees.
+
+**Complete beginners: Wix**
+Gentlest learning curve. May eventually need upgrading.
+
+**How to choose:**
+1. Assess your technical comfort
+2. Clarify if selling is primary or secondary
+3. Estimate catalog size
+4. Define budget constraints
+5. Check required integrations
+
+**Straightforward answer:** Most people asking this question should use Shopify. It's consistently capable across the board. Only deviate if specific requirements point elsewhere.""",
+
+"What platform do most successful online stores use?": """Platform usage among successful merchants:
+
+**Market distribution:**
+- WooCommerce: ~36% (many small stores)
+- Shopify: ~26% (growing rapidly)
+- Remainder split among Squarespace, BigCommerce, Magento
+
+**Among higher-revenue stores:**
+Shopify dominates. Growth-focused merchants gravitate there. BigCommerce holds strong in B2B.
+
+**What matters more than platform:**
+1. Product-market alignment
+2. Customer acquisition capability
+3. Professional presentation
+4. Mobile optimization
+5. Customer experience
+6. Marketing execution
+
+**Patterns in successful stores:**
+- Crystal-clear value propositions
+- Professional photography
+- Streamlined checkout
+- Active marketing
+- Email list cultivation
+- Social proof display
+
+**Perspective:** Six-figure stores run on basic platforms. Struggling stores exist on Shopify Plus. Platform enables but doesn't create success.
+
+Your execution determines outcomes far more than platform selection.""",
+
+"What platform should I use for dropshipping?": """Dropshipping demands specific platform capabilities:
+
+**Leading choice: Shopify**
+- Tight supplier integrations (DSers, Spocket)
+- One-click product importing
+- Automated order forwarding
+- Largest dropshipping community
+- Most tutorial content available
+
+**Lower-cost path: WooCommerce**
+- Reduced ongoing expenses
+- AliDropship plugin option
+- More initial configuration
+- Suits technical users
+
+**Also works: BigCommerce**
+- Native supplier connections
+- No transaction fees (margin protection)
+- Less dropshipping community presence
+
+**Skip for dropshipping:**
+- Squarespace (poor inventory sync)
+- Etsy (violates their terms)
+
+**Success factors beyond platform:**
+- Supplier dependability matters most
+- Shipping times are your main challenge
+- Customer service is fully your problem
+- Thin margins require volume
+
+**Starting sequence:**
+1. Shopify trial activation
+2. Install DSers (free tier)
+3. Import 10-20 test products
+4. Run small test campaign
+5. Evaluate before expanding
+
+Platform features matter less than niche selection and marketing capability.""",
+
+"What should I look for in an ecommerce platform?": """Platform evaluation framework:
+
+**Essential requirements:**
+
+1. **Technical match**
+Honestly assess your skills. Can you handle self-hosting? If not, choose fully managed options.
+
+2. **Total cost picture**
+Monthly fees + processing + apps + themes + potential development
+
+3. **Payment support**
+Compatible with your preferred processor? Customer payment preferences?
+
+4. **Product compatibility**
+Physical, digital, subscription, service - verify support
+
+**Important considerations:**
+
+5. **Mobile experience** - Test on real devices
+6. **SEO tools** - URL control, metadata, speed
+7. **Shipping capabilities** - For physical goods
+8. **Support quality** - When problems arise
+9. **Scalability** - Can you grow without migrating?
+
+**Warning signs:**
+- No free trial
+- Unclear pricing
+- Poor mobile templates
+- Data export restrictions
+- Slow update cycles
+
+**Selection process:**
+1. Define requirements
+2. Narrow to 2-3 options
+3. Sign up for trials
+4. Test with real products
+5. Complete test purchases
+6. Try their support
+7. Decide from experience
+
+Analysis paralysis is the enemy. Your effort matters more than platform perfection.""",
+
+"What's the best ecommerce platform for digital products?": """Digital products need specialized handling:
+
+**Purpose-built: Gumroad**
+- Designed for digital creators
+- Simple setup and purchasing
+- Automatic delivery
+- Tax handling included
+- Free tier (10% fee)
+
+**For courses: Teachable/Thinkific**
+- Educational content focus
+- Progress tracking
+- Scheduled content release
+- Certificates
+- Community features
+
+**Mixed physical + digital: Shopify**
+- Handles both product types
+- Digital Downloads app (free)
+- Professional presentation
+- Broad ecosystem
+
+**Maximum control: WooCommerce**
+- Multiple delivery plugins
+- Full ownership
+- No platform cut
+
+**Essential features:**
+- Automatic post-purchase delivery
+- Download limits/expiration
+- License key support (software)
+- Streaming capability
+- Subscription handling
+
+**Match platform to product:**
+- Ebooks: Gumroad, Shopify
+- Courses: Teachable, Thinkific
+- Software: Gumroad, FastSpring
+- Music: Bandcamp
+- Design files: Gumroad, Creative Market
+
+Start with Gumroad unless specific needs dictate otherwise. It handles complexity so you can focus on creating.""",
+
+"What's the cheapest way to sell products online?": """Budget-conscious selling options, lowest to highest:
+
+**Free options:**
+- Facebook/Instagram Shops: Zero setup, processor fees only
+- Square Online Free: No monthly cost, 2.9% + 30 cents per transaction
+- Big Cartel Free: Up to 5 products
+
+**Very affordable ($5-15/month):**
+- Ecwid Starter: Add-on for existing sites
+- WooCommerce + cheap hosting
+- Etsy (per-listing fees, no monthly)
+
+**The true cost reality:**
+"Free" consumes time. Consider:
+- Learning curve hours
+- Problem-solving time
+- Working within limitations
+- Appearance tradeoffs
+
+**Practical calculation:**
+At $25/hour personal value, 10 extra hours fighting free tools = $250 effectively spent.
+
+**Recommendations by situation:**
+- Testing ideas: Facebook Shop or Square Free
+- Serious but broke: Square Free, upgrade when profitable
+- Have $30/month: Wix or Shopify (worth it)
+- Technical and patient: WooCommerce
+
+**Universal truth:** Payment processor fees (2.9% + 30 cents typical) exist everywhere. No platform eliminates them.""",
+
+"What's the easiest platform to set up an online shop?": """Setup difficulty ranking from experience:
+
+**1. Shopify (Easiest)**
+Step-by-step guided setup. Excellent help documentation. Most straightforward path to selling.
+
+**2. Square Online**
+Very simple for basics. Free tier available. Great for Square users or local businesses.
+
+**3. Squarespace**
+Beautiful templates, intuitive editing. Design-focused approach.
+
+**4. Wix**
+Drag-and-drop builder. Good for content sites adding commerce.
+
+**5. BigCommerce**
+More features means more configuration. Well documented though.
+
+**6. WooCommerce (Hardest)**
+Requires WordPress, hosting setup, plugin configuration. Technical users only.
+
+**Quick start tips:**
+- Pick a template close to your vision
+- Launch with fewer products initially
+- Skip extensive customization pre-launch
+- Done beats perfect
+
+**My take:** Shopify balances ease with capability. Simple enough to launch fast, powerful enough to avoid migration later. Don't let setup difficulty become your excuse to delay.""",
+
+"Which ecommerce platform has the best SEO features?": """SEO capability breakdown by platform:
+
+**Tier 1 - Maximum SEO control:**
+
+**WooCommerce**
+- WordPress foundation (SEO champion)
+- Yoast/RankMath integration
+- Complete technical access
+- Superior blogging
+
+**Tier 2 - Strong built-in SEO:**
+
+**Shopify**
+- Clean URL architecture
+- Auto-generated sitemaps
+- Mobile optimization
+- Solid page speed
+
+**BigCommerce**
+- Comprehensive SEO settings
+- Automatic rich snippets
+- No forced URL prefixes
+
+**Tier 3 - Sufficient for most:**
+
+**Squarespace** - Clean code, limited customization
+
+**What actually drives ecommerce SEO:**
+1. Page loading speed
+2. Mobile experience
+3. Product description quality
+4. User engagement signals
+5. Backlink acquisition
+
+**Reality:** Platform SEO features are baseline. I've watched basic platform sites outrank premium setups. Content and promotion effort trump platform capabilities.
+
+**Recommendation:** WooCommerce for maximum control. Shopify or BigCommerce for typical merchants.""",
+
+"Which ecommerce platform is best for beginners?": """Beginner-friendly platforms balancing ease with growth potential:
+
+**Top recommendation: Shopify**
+- Clear dashboard layout
+- Guided setup walkthrough
+- Comprehensive documentation
+- Always-available support
+- Scales with you
+- Active community
+
+**For local businesses: Square Online**
+- Free plan exists
+- Simple setup
+- In-person sales integration
+
+**For visual brands: Squarespace**
+- Gorgeous templates
+- Best for small catalogs
+- Design-first interface
+
+**For features: BigCommerce**
+- More built-in capabilities
+- Zero transaction fees
+- Solid scaling path
+
+**Budget-friendly: Wix**
+- Lower entry price
+- Drag-and-drop editing
+- Commerce features developing
+
+**Beginners should avoid:**
+- WooCommerce (technical demands)
+- Magento (enterprise complexity)
+- Custom builds (expensive, unnecessary)
+
+**Launch plan:**
+1. Start Shopify trial
+2. Add 5-10 products
+3. Enable payments
+4. Launch within one week
+5. Improve from real feedback
+
+The best platform is one you'll actually use. Don't let comparison shopping delay starting.""",
+
+"Which is better, Shopify or WooCommerce?": """Shopify versus WooCommerce comes down to convenience versus control.
+
+**Shopify approach:**
+Managed everything. Updates, security, hosting handled. Monthly fees but minimal time.
+
+Cost: $29-79/month plus apps
+Technical requirement: Minimal
+Time commitment: Low
+
+**WooCommerce approach:**
+Complete ownership but involvement required. You manage hosting, updates, security.
+
+Cost: $10-30/month for hosting and plugins
+Technical requirement: WordPress familiarity
+Time commitment: Moderate to significant
+
+**Decision guide:**
+
+Choose Shopify when:
+- Hassle-free operation appeals
+- Technical skills are limited
+- 24/7 support matters
+- Monthly fees fit budget
+
+Choose WooCommerce when:
+- WordPress is already familiar
+- Control is paramount
+- Technical resources exist
+- Lower ongoing costs preferred
+
+**Honest assessment:** If you're comparing, Shopify likely suits you better. WooCommerce users typically know they want it due to specific technical requirements.
+
+Both power successful businesses. Products and marketing determine success, not platform.""",
+
+"Which platform has the lowest transaction fees?": """Transaction fee breakdown affecting your margins:
+
+**Lowest platform fees:**
+
+1. **BigCommerce** - 0% regardless of plan
+Zero additional fees on any payment processor.
+
+2. **WooCommerce** - 0% platform fee
+Only payment processor charges apply.
+
+3. **Shopify with Shopify Payments** - 0% extra
+Standard processing rates only.
+
+4. **Squarespace** - 0% on Commerce plans
+3% on lower tiers.
+
+**Shopify consideration:**
+With Shopify Payments: No additional fee
+With other processors: +0.5% to +2% ON TOP of processor fees
+
+**Standard processor rates:**
+- Stripe: 2.9% + 30 cents
+- PayPal: 3.49% + 49 cents
+- Square: 2.9% + 30 cents
+
+**Example on $1,000 sale:**
+- BigCommerce + Stripe: $29.30
+- Shopify + Shopify Payments: $29.30
+- Shopify + PayPal: $54.90
+
+**At $100,000 annual volume:**
+2% difference = $2,000/year impact
+
+**Recommendations:**
+- Fee-sensitive: BigCommerce or WooCommerce
+- Using Shopify: Commit to Shopify Payments
+- High volume: Negotiate processor rates directly""",
+
+}
+
+# =============================================================================
+# SEPTEMBER RUN 2 RESPONSES (20 unique responses) - Wix in 8 queries (40%)
+# =============================================================================
+
+SEPTEMBER_RUN2_RESPONSES = {
+
+"How do I choose between Wix and Shopify?": """The Wix vs Shopify question in 2025 hinges on your primary goal.
+
+**Wix fits when:**
+- Content and commerce share equal importance
+- Design customization is a priority
+- Your product count stays under 50
+- Budget constraints exist
+
+**Shopify fits when:**
+- Selling is the central purpose
+- Growth and scaling are planned
+- You need professional commerce tools
+- Support availability matters
+
+**Quick comparison:**
+- Design freedom: Wix wins
+- Commerce capability: Shopify wins
+- Ease of use: Both reasonable
+- Price: Nearly identical
+
+Fundamentally, Wix builds websites that can sell. Shopify builds stores that can have content. Choose based on your primary need.""",
+
+"How do I start an online store?": """Practical store launch roadmap for 2025:
+
+**First steps:**
+Select a platform - Shopify, Wix, and WooCommerce lead the market. Secure a memorable domain. Keep it simple initially.
+
+**Building phase:**
+Use a template close to your needs. Add initial products with good photos and clear descriptions. Connect payment processing.
+
+**Pre-launch:**
+Configure shipping. Add core pages (About, Contact, Policies). Test checkout by completing an actual purchase.
+
+**Go live:**
+Launch when functional, not perfect. Real customer feedback guides better than endless preparation.
+
+**Starting budget:** ~$35/month covers essentials.
+
+The biggest mistake is waiting for perfection. Ship something and iterate.""",
+
+"How does Shopify compare to other ecommerce platforms?": """How Shopify measures against the competition:
+
+**Versus WooCommerce**
+Shopify provides managed simplicity. WooCommerce offers control with effort. Pick Shopify for ease, WooCommerce for flexibility.
+
+**Versus BigCommerce**
+Comparable features and pricing. BigCommerce has more native capabilities; Shopify has more apps. BigCommerce avoids transaction fees entirely.
+
+**Versus Squarespace**
+Squarespace leads in design templates. Shopify leads in commerce depth. Squarespace suits small visual catalogs.
+
+**Versus Magento**
+Magento handles enterprise complexity. Shopify serves practical needs for most merchants.
+
+**Shopify advantages:**
+- Extensive app marketplace
+- Strong community
+- Reliable uptime
+- Capable POS
+
+**Shopify disadvantages:**
+- Third-party payment fees
+- Basic blogging
+- App dependency
+
+Shopify is the safe mainstream option - solid across categories without being best in any specific one.""",
+
+"Is Shopify worth the price?": """Evaluating Shopify's cost versus value:
+
+**The investment:**
+- Basic: $29/month
+- Standard: $79/month
+- Advanced: $299/month
+- Apps: Often $20-100/month extra
+
+**What you receive:**
+- Fully managed hosting
+- Security and updates
+- 24/7 support access
+- Payment processing
+- Professional storefront
+
+**Good value when:**
+- Building a serious business
+- Time matters more than money
+- Reliability is essential
+- Scaling is the goal
+
+**Questionable value when:**
+- Testing unproven ideas
+- Very low sales volume
+- WordPress skills exist
+- Unusual requirements
+
+**Break-even math:** $348 annual cost requires ~$1,500-2,000 profit to justify.
+
+For committed merchants: yes, worth it. For experimenters: try Wix or free options first.""",
+
+"Is Squarespace good for selling products?": """Squarespace commerce capabilities have strengths and limits.
+
+**Strengths:**
+- Beautiful, polished templates
+- Clean visual editor
+- Integrated pricing
+- Excellent for visual brands
+- Portfolio-shop combinations
+
+**Limits:**
+- Few payment processor options
+- Basic inventory tools
+- No dropshipping
+- Small app ecosystem
+- Limited shipping choices
+
+**Ideal users:**
+- Visual artists
+- Photographers
+- Small fashion collections
+- Service businesses adding products
+- Sub-50 item catalogs
+
+**Poor fit for:**
+- High-volume operations
+- Dropshipping models
+- Complex inventory
+- Multi-channel needs
+
+**Cost:** $27-49/month for commerce plans
+
+Squarespace handles selling when design drives conversions and inventory stays manageable. Commerce-primary businesses should look elsewhere.""",
+
+"Should I use BigCommerce or Shopify for my store?": """BigCommerce and Shopify both serve merchants well. Here's how to choose:
+
+**BigCommerce strengths:**
+- Richer native feature set
+- No transaction fees ever
+- Better B2B capabilities
+- Unlimited staff accounts
+- Superior product options
+
+**Shopify strengths:**
+- Massive app selection
+- More learning resources
+- Brand familiarity
+- Better POS integration
+- Larger community
+
+**Comparison:**
+| Aspect | BigCommerce | Shopify |
+|--------|-------------|---------|
+| Native features | More | Fewer |
+| Apps | Good | Excellent |
+| Transaction fees | None | Possible |
+| B2B | Built-in | App-based |
+| Learning curve | Slightly more | Slightly less |
+
+**Real costs:** Both $29/month starting, but Shopify often requires paid apps to match BigCommerce features.
+
+**Recommendation:** Try both trials with your products. The right choice usually becomes clear through hands-on experience.""",
+
+"What are the best alternatives to WooCommerce?": """WooCommerce alternatives based on why you're leaving:
+
+**Escaping maintenance?**
+- Shopify: Fully hosted, supported
+- BigCommerce: Same benefits, more features
+
+**Want simpler editing?**
+- Squarespace: Clean, beautiful interface
+
+**Staying open-source?**
+- PrestaShop: Standalone alternative
+- OpenCart: Lightweight option
+
+**Going enterprise?**
+- Magento: Powerful, complex
+- Salesforce Commerce: Complete ecosystem
+
+**Why people leave WooCommerce:**
+- Plugin conflict headaches
+- Security self-management
+- Performance tuning complexity
+- Wanting dedicated support
+
+**Migration warning:**
+Platform switches hurt - product migration, redirects, customer data, learning curves. Ensure the switch genuinely solves problems.
+
+**Common destination:** Shopify absorbs most WooCommerce migrants. It eliminates maintenance issues while supporting growth.""",
+
+"What ecommerce platform should I use for a small business?": """Small business platform recommendations balancing cost and capability:
+
+**Primary recommendation: Shopify ($29/month)**
+- Fully managed
+- Professional presentation
+- Growth accommodating
+- Support available
+
+**Budget path: Square Online (Free-$29)**
+- Free tier exists
+- Local business friendly
+- Simple approach
+
+**Technical path: WooCommerce**
+- No platform fee
+- Hosting ~$10-20/month
+- Hands-on required
+
+**Avoid:**
+- Over-engineering before validation
+- Premium themes pre-revenue
+- App overload without understanding
+
+**Guidance:** Shopify Basic handles most small business needs. Cash-strapped? Square's free tier works. Platform selection shouldn't stop your launch.""",
+
+"What ecommerce tools do I need to start selling online?": """Essential selling toolkit by priority:
+
+**Required:**
+- Platform (Shopify, Wix, WooCommerce, etc.)
+- Domain (~$12/year)
+- Payment processing (platform-included usually)
+- Product photography
+
+**Within first month:**
+- Email capture (Mailchimp free)
+- Analytics (Google Analytics)
+- Design tool (Canva free)
+
+**When scale demands:**
+- Shipping software
+- Customer support tools
+- Accounting software
+- Social scheduling
+
+**Starting costs:**
+- Platform: $29-39/month
+- Domain: ~$1/month
+- Email: $0 initially
+- Minimum: ~$35/month
+
+**Common errors:**
+- Buying everything before launching
+- Premium plans too early
+- Complexity before basics
+- Skipping email lists
+
+Minimal start. Add tools as specific needs surface.""",
+
+"What is the best ecommerce platform in 2026?": """Best platform varies by situation:
+
+**General merchants: Shopify**
+Mainstream reliable choice. Handles startups to major brands. Strong ecosystem.
+
+**Technical users: WooCommerce**
+Total control, no monthly fees. Demands ongoing management.
+
+**Design-focused: Squarespace**
+Superior templates. Small visual catalogs.
+
+**B2B sellers: BigCommerce**
+Wholesale features native. No transaction fees.
+
+**New beginners: Wix**
+Easiest entry. May need upgrading later.
+
+**Selection criteria:**
+1. Technical ability
+2. Commerce versus content priority
+3. Catalog size
+4. Budget limits
+5. Integration needs
+
+**Simple answer:** If you're asking, Shopify is likely right. It succeeds at most things without excelling at any specific one. Choose differently only with specific requirements.""",
+
+"What platform do most successful online stores use?": """Platform distribution among successful stores:
+
+**By store count:**
+- WooCommerce: ~36% (mostly smaller)
+- Shopify: ~26% (fastest growth)
+- Others: Squarespace, BigCommerce, Magento
+
+**Among high-revenue merchants:**
+Shopify leads. Growth-oriented sellers choose it. BigCommerce strong in B2B.
+
+**More important than platform:**
+1. Product-market fit
+2. Customer acquisition
+3. Professional execution
+4. Mobile experience
+5. Service quality
+6. Marketing consistency
+
+**Success indicators:**
+- Clear value propositions
+- Quality product images
+- Simple checkout
+- Active promotion
+- Email list building
+- Social proof
+
+**Reality check:** Six-figure stores run on basic platforms. Struggling stores exist on premium platforms. Your execution matters, not your platform.
+
+Platform enables success but doesn't cause it.""",
+
+"What platform should I use for dropshipping?": """Dropshipping platform requirements:
+
+**Best option: Shopify**
+- Seamless supplier apps (DSers, Spocket)
+- Easy product import
+- Automatic order routing
+- Biggest dropshipping community
+- Most educational content
+
+**Budget alternative: WooCommerce**
+- Lower costs
+- AliDropship available
+- More setup work
+- Suits technical users
+
+**Also viable: BigCommerce**
+- Supplier integrations
+- No transaction fees
+- Less community support
+
+**Avoid for dropshipping:**
+- Squarespace (sync issues)
+- Etsy (against rules)
+
+**Critical factors:**
+- Supplier reliability trumps platform
+- Shipping times are your main problem
+- Customer service is your responsibility
+- Margins are thin, volume essential
+
+**Starting approach:**
+1. Shopify trial
+2. Install DSers free
+3. Import test products
+4. Small ad test
+5. Assess results first
+
+Niche and marketing matter more than platform.""",
+
+"What should I look for in an ecommerce platform?": """Platform selection framework:
+
+**Must-have criteria:**
+
+1. **Skill alignment**
+Be honest about technical ability. Self-hosting capable? If not, choose managed.
+
+2. **True cost**
+Platform + fees + apps + themes + development potential
+
+3. **Payment compatibility**
+Your processor works? Customer preferences supported?
+
+4. **Product type support**
+Physical, digital, subscription, service - confirmed compatibility
+
+**Important factors:**
+
+5. **Mobile quality** - Actual device testing
+6. **SEO features** - URLs, metadata, speed
+7. **Shipping tools** - Physical goods needs
+8. **Support access** - Problem resolution
+9. **Growth capacity** - Scale without migrating
+
+**Red flags:**
+- No trial
+- Hidden costs
+- Bad mobile experience
+- Export limitations
+- Stale updates
+
+**Process:**
+1. List requirements
+2. Shortlist 2-3
+3. Trial all
+4. Real product testing
+5. Test checkout
+6. Contact support
+7. Decide from experience
+
+Over-analysis delays progress. Your execution outweighs platform perfection.""",
+
+"What's the best ecommerce platform for digital products?": """Digital product platform considerations:
+
+**Digital-first: Gumroad**
+- Built for creators
+- Simple purchasing
+- Automated delivery
+- Tax compliance
+- Free tier available
+
+**For education: Teachable/Thinkific**
+- Course-oriented
+- Student tracking
+- Drip scheduling
+- Certificates
+- Community tools
+
+**Mixed catalog: Shopify**
+- Digital + physical together
+- Free Digital Downloads app
+- Professional appearance
+
+**Full control: WooCommerce**
+- Many delivery plugins
+- Complete ownership
+- No platform fees
+
+**Needed features:**
+- Auto-delivery post-purchase
+- Download management
+- License keys (software)
+- Streaming options
+- Subscription support
+
+**Platform by product:**
+- Ebooks: Gumroad, Shopify
+- Courses: Teachable, Thinkific
+- Software: Gumroad, FastSpring
+- Music: Bandcamp
+- Design assets: Gumroad
+
+Gumroad works for most unless specific needs dictate otherwise.""",
+
+"What's the cheapest way to sell products online?": """Selling options by cost, lowest first:
+
+**Zero monthly cost:**
+- Facebook/Instagram Shops: Processor fees only
+- Square Online Free: 2.9% + 30 cents
+- Big Cartel Free: Up to 5 products
+
+**Very cheap ($5-15/month):**
+- Ecwid Starter
+- WooCommerce + budget hosting
+- Etsy (per-listing, no monthly)
+
+**Hidden costs of "free":**
+Time spent:
+- Learning workarounds
+- Fixing problems
+- Accepting limitations
+- Appearance compromises
+
+**Time calculation:**
+10 hours at $25/hour value = $250 "spent" on free tools.
+
+**Suggestions:**
+- Just testing: Facebook Shop or Square Free
+- Serious but broke: Square Free, upgrade later
+- Have $30/month: Wix or Shopify saves time
+- Technical patience: WooCommerce
+
+Processor fees (~2.9% + 30 cents) exist everywhere. No platform eliminates them.""",
+
+"What's the easiest platform to set up an online shop?": """Ease of setup ranking:
+
+**1. Shopify (Easiest)**
+Guided process, great documentation, fastest path to selling.
+
+**2. Square Online**
+Very simple basics. Free option. Local business friendly.
+
+**3. Squarespace**
+Beautiful templates. Intuitive editing.
+
+**4. Wix**
+Drag-drop building. Content sites with commerce.
+
+**5. BigCommerce**
+More features, more setup. Well documented.
+
+**6. WooCommerce (Hardest)**
+WordPress required, hosting needed, plugin configuration. Technical users.
+
+**Setup tips:**
+- Template close to your vision
+- Fewer products initially
+- Skip pre-launch over-customization
+- Done beats perfect
+
+**Recommendation:** Shopify balances simplicity with capability. Easy start, room to grow. Don't let setup difficulty delay action.""",
+
+"Which ecommerce platform has the best SEO features?": """SEO capabilities by platform tier:
+
+**Maximum control:**
+
+**WooCommerce**
+- WordPress SEO power
+- Yoast/RankMath plugins
+- Full technical access
+- Native blogging strength
+
+**Strong built-in:**
+
+**Shopify**
+- Clean URLs
+- Auto sitemaps
+- Mobile-first
+- Good speed
+
+**BigCommerce**
+- Detailed SEO settings
+- Rich snippets automatic
+- Flexible URLs
+
+**Adequate:**
+
+**Squarespace** - Clean code, limited control
+
+**Real SEO drivers:**
+1. Loading speed
+2. Mobile experience
+3. Content quality
+4. User signals
+5. Backlinks
+
+**Truth:** Platform SEO is table stakes. Basic sites outrank premium ones regularly. Content and promotion matter more.
+
+**Picks:** WooCommerce for control maximizers. Shopify/BigCommerce for typical merchants.""",
+
+"Which ecommerce platform is best for beginners?": """Beginner platforms combining ease with growth room:
+
+**Best overall: Shopify**
+- Intuitive interface
+- Guided setup
+- Excellent documentation
+- 24/7 support
+- Scales with you
+- Large community
+
+**Local businesses: Square Online**
+- Free tier available
+- Simple setup
+- In-person integration
+
+**Visual brands: Squarespace**
+- Beautiful templates
+- Small catalog focus
+- Design-centered
+
+**Feature-rich: BigCommerce**
+- More capabilities included
+- No transaction fees
+- Growth capable
+
+**Budget: Wix**
+- Lower entry cost
+- Drag-drop editor
+- Commerce still developing
+
+**Beginners avoid:**
+- WooCommerce (technical)
+- Magento (enterprise)
+- Custom solutions (expensive)
+
+**Action plan:**
+1. Shopify trial
+2. Add 5-10 products
+3. Enable payments
+4. Launch week one
+5. Improve from feedback
+
+Best platform is one you'll use. Don't let comparisons delay starting.""",
+
+"Which is better, Shopify or WooCommerce?": """Shopify vs WooCommerce: convenience versus control.
+
+**Shopify:**
+Everything managed - updates, security, hosting. Monthly fees, minimal time.
+
+Cost: $29-79/month + apps
+Technical: Minimal
+Time: Low
+
+**WooCommerce:**
+Complete control, more involvement. You handle hosting, updates, security.
+
+Cost: $10-30/month
+Technical: WordPress required
+Time: Moderate-high
+
+**Choose Shopify:**
+- Want hassle-free
+- Not technical
+- Need 24/7 support
+- Budget allows fees
+
+**Choose WooCommerce:**
+- Know WordPress
+- Need control
+- Have technical resources
+- Prefer lower costs
+
+**Assessment:** If comparing, Shopify likely fits better. WooCommerce users usually know they want it for specific technical reasons.
+
+Both support successful businesses. Success depends on products and marketing, not platform.""",
+
+"Which platform has the lowest transaction fees?": """Transaction fees comparison:
+
+**Zero platform fees:**
+
+1. **BigCommerce** - 0% on all plans
+No extra fees on any processor.
+
+2. **WooCommerce** - 0% platform
+Only processor fees apply.
+
+3. **Shopify + Shopify Payments** - 0% extra
+Standard processing only.
+
+4. **Squarespace Commerce** - 0%
+3% on lower tiers.
+
+**Shopify note:**
+Shopify Payments: 0% extra
+Other processors: +0.5-2% additional
+
+**Processor rates:**
+- Stripe: 2.9% + 30 cents
+- PayPal: 3.49% + 49 cents
+- Square: 2.9% + 30 cents
+
+**$1,000 sale example:**
+- BigCommerce + Stripe: $29.30
+- Shopify + Shopify Payments: $29.30
+- Shopify + PayPal: $54.90
+
+**$100,000 annual volume:**
+2% difference = $2,000/year
+
+**Recommendations:**
+- Fee-focused: BigCommerce, WooCommerce
+- Using Shopify: Use Shopify Payments
+- High volume: Negotiate processor rates""",
+
+}
+
+# =============================================================================
+# OCTOBER RUN 1 RESPONSES (20 unique responses) - Wix in 10 queries (50%)
+# =============================================================================
+
+OCTOBER_RUN1_RESPONSES = {
+
+"How do I choose between Wix and Shopify?": """Making the Wix vs Shopify decision in fall 2025:
+
+**Wix suits you if:**
+- Website content matters as much as products
+- You want creative design control
+- Your catalog is small (under 50 items)
+- Budget flexibility is needed
+
+**Shopify suits you if:**
+- Selling is your primary business function
+- Scaling beyond small operations is planned
+- Professional commerce tools are needed
+- 24/7 support matters to you
+
+**Direct comparison:**
+- Design flexibility: Wix advantage
+- Commerce features: Shopify advantage
+- Starting price: Similar (~$27-29)
+- Learning curve: Both accessible
+
+The core difference: Wix is a website builder with commerce added. Shopify is a commerce platform with website features added.""",
+
+"How do I start an online store?": """Launching your store - a practical 2025 approach:
+
+**Setup phase:**
+Pick your platform - Shopify or Wix work for most situations. Claim your domain. Start simple.
+
+**Build phase:**
+Choose a clean template. Add initial products with quality photos. Set up payment processing through Stripe or PayPal.
+
+**Polish phase:**
+Configure shipping rates. Add essential pages. Test everything - complete an actual test purchase.
+
+**Launch:**
+Go live when it works, not when it's perfect. Real feedback teaches faster than planning.
+
+**Budget reality:** Around $35-40/month gets you started properly.
+
+Biggest mistake: Endless preparation. Launch and learn.""",
+
+"How does Shopify compare to other ecommerce platforms?": """Shopify's competitive position:
+
+**Against WooCommerce**
+Shopify: managed simplicity
+WooCommerce: control with responsibility
+Shopify for convenience, WooCommerce for customization.
+
+**Against BigCommerce**
+Similar offerings. BigCommerce has more built-in; Shopify has more apps. BigCommerce skips transaction fees.
+
+**Against Squarespace**
+Squarespace: design leadership
+Shopify: commerce leadership
+Squarespace for visual brands, Shopify for serious selling.
+
+**Against Magento**
+Magento: enterprise power with enterprise complexity
+Shopify: practical for most merchants
+
+**Shopify wins on:**
+- App variety
+- Community resources
+- Platform stability
+- POS capabilities
+
+**Shopify loses on:**
+- Third-party payment fees
+- Native blogging
+- Feature inclusion (apps required)
+
+Shopify is the safe middle choice - consistently good without specializing.""",
+
+"Is Shopify worth the price?": """Assessing Shopify's value:
+
+**Costs involved:**
+- Basic: $29/month
+- Shopify: $79/month
+- Advanced: $299/month
+- Apps: Typically $20-100 more
+
+**Value delivered:**
+- Managed infrastructure
+- Security and updates
+- Always-available support
+- Payment integration
+- Professional appearance
+
+**Worth it when:**
+- Business intentions are serious
+- Time is valuable
+- Reliability matters
+- Growth is expected
+
+**Not worth it when:**
+- Testing unproven concepts
+- Minimal sales expected
+- WordPress skills exist
+- Requirements are unusual
+
+**Math:** $348/year needs roughly $1,500-2,000 profit to justify.
+
+Serious sellers: worth it. Experimenters: try Square Online free first.""",
+
+"Is Squarespace good for selling products?": """Squarespace for ecommerce - strengths and limits:
+
+**What works:**
+- Stunning templates
+- Easy visual editing
+- Simple pricing
+- Good for visual products
+- Portfolio-plus-shop scenarios
+
+**What doesn't:**
+- Limited payment options
+- Basic inventory
+- No dropshipping
+- Fewer integrations
+- Shipping limitations
+
+**Ideal Squarespace sellers:**
+- Visual artists
+- Photographers
+- Small fashion lines
+- Services with products
+- Compact catalogs
+
+**Not ideal for:**
+- Volume sellers
+- Dropshippers
+- Complex inventory
+- Multi-channel needs
+
+**Pricing:** Commerce plans $27-49/month
+
+Squarespace works when aesthetics drive sales and catalog stays manageable. Commerce-focused businesses should explore alternatives.""",
+
+"Should I use BigCommerce or Shopify for my store?": """BigCommerce versus Shopify for serious merchants:
+
+**BigCommerce wins when:**
+- You want more included features
+- Transaction fees matter (zero with BigCommerce)
+- B2B/wholesale is important
+- Staff accounts are unlimited
+- Product options are complex
+
+**Shopify wins when:**
+- App selection is paramount
+- Community resources matter
+- Brand recognition helps
+- POS is needed
+- Ecosystem breadth counts
+
+**Side by side:**
+| Factor | BigCommerce | Shopify |
+|--------|-------------|---------|
+| Features | More native | More via apps |
+| Fees | None | 0-2% possible |
+| B2B | Built-in | App-based |
+| Apps | Good | Excellent |
+| Ease | Good | Slightly better |
+
+**Practical costs:** Both start at $29/month, but Shopify's app needs often raise true costs.
+
+Trial both with real products. One typically feels right for your workflow.""",
+
+"What are the best alternatives to WooCommerce?": """WooCommerce alternatives by departure reason:
+
+**Leaving maintenance behind?**
+- Shopify: Managed, supported, reliable
+- BigCommerce: Similar benefits, more features
+
+**Seeking easier editing?**
+- Squarespace: Beautiful, intuitive
+- Wix: Drag-and-drop simplicity
+
+**Staying open-source?**
+- PrestaShop: Standalone solution
+- OpenCart: Lighter approach
+
+**Going enterprise?**
+- Magento: Power and complexity
+- Salesforce Commerce: Full suite
+
+**Common exit reasons:**
+- Plugin conflicts
+- Security responsibility
+- Performance challenges
+- Support availability
+
+**Migration truth:**
+Platform changes hurt - data migration, redirects, learning curves. Confirm necessity before committing.
+
+**Typical landing:** Shopify takes most WooCommerce refugees. Maintenance problems disappear while growth potential remains.""",
+
+"What ecommerce platform should I use for a small business?": """Small business platform guidance:
+
+**Top choice: Shopify ($29/month)**
+- Managed completely
+- Professional results
+- Scalable
+- Support included
+
+**Budget choice: Square Online (Free-$29)**
+- Zero-cost entry
+- Local business fit
+- Straightforward
+
+**Technical choice: WooCommerce**
+- No platform fee
+- Hosting $10-20/month
+- Hands-on required
+
+**Budget with simplicity: Wix ($27/month)**
+- Affordable entry
+- Easy editor
+- Growing commerce features
+
+**Skip:**
+- Over-engineering pre-validation
+- Premium themes before revenue
+- App overload
+
+**Advice:** Shopify Basic serves most small businesses. Tight budget? Square Free or Wix gets you started. Don't let platform choice delay launching.""",
+
+"What ecommerce tools do I need to start selling online?": """Starting toolkit priorities:
+
+**Must-have:**
+- Ecommerce platform (Shopify, Wix, WooCommerce, etc.)
+- Domain name (~$12/year)
+- Payment processing (usually included)
+- Good product photos
+
+**Add within month one:**
+- Email collection (Mailchimp free)
+- Analytics (Google Analytics)
+- Graphics (Canva free)
+
+**Add as volume grows:**
+- Shipping tools
+- Customer service software
+- Accounting integration
+- Social scheduling
+
+**Startup math:**
+- Platform: $29-39/month
+- Domain: ~$1/month
+- Email: Free tier
+- Total minimum: ~$35/month
+
+**Avoid:**
+- Tool overload pre-launch
+- Premium tiers prematurely
+- Unnecessary complexity
+- Skipping email collection
+
+Start lean. Add tools when problems demand them.""",
+
+"What is the best ecommerce platform in 2026?": """Platform recommendations by situation:
+
+**Most sellers: Shopify**
+Safe mainstream choice. Handles small to large. Reliable ecosystem.
+
+**Technical users: WooCommerce**
+Maximum flexibility. No monthly cost. Requires management.
+
+**Design-focused: Squarespace**
+Best-looking templates. Small visual catalogs.
+
+**B2B sellers: BigCommerce**
+Strong wholesale tools. Zero transaction fees.
+
+**Easy entry: Wix**
+Gentlest learning curve. Room to grow.
+
+**Decision factors:**
+1. Technical comfort
+2. Commerce vs content priority
+3. Catalog size
+4. Budget limits
+5. Integration requirements
+
+**Straight answer:** Asking this question? Shopify is probably right. It does most things well enough. Only choose differently with specific needs.""",
+
+"What platform do most successful online stores use?": """Successful store platform breakdown:
+
+**Market share:**
+- WooCommerce: ~36% (many small)
+- Shopify: ~26% (fastest growing)
+- Others: Squarespace, BigCommerce, Magento
+
+**High-revenue stores:**
+Shopify dominates. Growth-minded merchants favor it. BigCommerce strong in B2B.
+
+**Factors more important than platform:**
+1. Product-market alignment
+2. Customer acquisition
+3. Professional presentation
+4. Mobile experience
+5. Customer service
+6. Marketing consistency
+
+**Success patterns:**
+- Clear value props
+- Quality photography
+- Streamlined checkout
+- Active marketing
+- Email cultivation
+- Social proof
+
+**Truth:** Basic platforms host six-figure stores. Premium platforms host struggling stores. Execution determines success.
+
+Platform choice enables, not causes, results.""",
+
+"What platform should I use for dropshipping?": """Dropshipping platform needs:
+
+**Leading option: Shopify**
+- Tight supplier integrations
+- Quick product imports
+- Auto order routing
+- Biggest community
+- Most tutorials
+
+**Budget option: WooCommerce**
+- Lower ongoing costs
+- AliDropship works
+- More setup time
+- Technical users preferred
+
+**Also works: BigCommerce**
+- Supplier integrations
+- No transaction fees
+- Less community
+
+**Avoid:**
+- Squarespace (sync problems)
+- Etsy (terms violation)
+
+**Success factors:**
+- Supplier reliability > platform
+- Shipping times are the challenge
+- Customer service is yours
+- Volume required for thin margins
+
+**Start with:**
+1. Shopify trial
+2. DSers free tier
+3. Import test products
+4. Small test campaign
+5. Evaluate before scaling
+
+Niche and marketing outweigh platform features.""",
+
+"What should I look for in an ecommerce platform?": """Platform evaluation checklist:
+
+**Essential criteria:**
+
+1. **Skill fit**
+Honest technical assessment. Self-host capable? If not, choose managed.
+
+2. **True cost**
+Platform + fees + apps + themes + development
+
+3. **Payment support**
+Preferred processors? Customer payment methods?
+
+4. **Product type**
+Physical, digital, subscription, service - verified support
+
+**Important criteria:**
+
+5. **Mobile experience** - Real device tests
+6. **SEO capability** - URLs, metadata, speed
+7. **Shipping tools** - Physical goods needs
+8. **Support quality** - Problem solving
+9. **Growth path** - Scale without migrating
+
+**Warning signs:**
+- No trial offered
+- Hidden fees
+- Poor mobile
+- Export restrictions
+- Slow development
+
+**Process:**
+1. List must-haves
+2. Narrow to 2-3
+3. Trial each
+4. Test with products
+5. Try checkout
+6. Test support
+7. Decide by experience
+
+Avoid analysis paralysis. Execution matters more than perfect platform.""",
+
+"What's the best ecommerce platform for digital products?": """Digital product platform options:
+
+**Built for digital: Gumroad**
+- Creator-focused
+- Simple checkout
+- Auto delivery
+- Tax handling
+- Free tier (10% fee)
+
+**For courses: Teachable/Thinkific**
+- Education-specific
+- Progress tracking
+- Drip content
+- Certificates
+- Community
+
+**Mixed products: Shopify**
+- Physical + digital
+- Digital Downloads app
+- Professional look
+
+**Full control: WooCommerce**
+- Delivery plugins
+- Complete ownership
+- No platform fees
+
+**Key features needed:**
+- Auto delivery
+- Download limits
+- License keys (software)
+- Streaming
+- Subscriptions
+
+**Match product to platform:**
+- Ebooks: Gumroad, Shopify
+- Courses: Teachable, Thinkific
+- Software: Gumroad, FastSpring
+- Music: Bandcamp
+- Design files: Gumroad
+
+Default to Gumroad unless specific needs point elsewhere.""",
+
+"What's the cheapest way to sell products online?": """Lowest cost selling options:
+
+**Free:**
+- Facebook/Instagram Shops: Processor fees only
+- Square Online Free: 2.9% + 30 cents
+- Big Cartel Free: 5 products max
+
+**Very low ($5-15/month):**
+- Ecwid Starter
+- WooCommerce + basic hosting
+- Etsy (listing fees)
+
+**Hidden costs of "free":**
+- Learning time
+- Problem solving
+- Limitations
+- Appearance trade-offs
+
+**Value calculation:**
+10 hours at $25/hour = $250 hidden cost
+
+**Recommendations:**
+- Testing: Facebook Shop or Square Free
+- Serious but broke: Square Free, upgrade later
+- Have $30: Wix or Shopify
+- Technical: WooCommerce
+
+Processor fees (~2.9% + 30 cents) exist on all platforms.""",
+
+"What's the easiest platform to set up an online shop?": """Setup ease ranking:
+
+**1. Shopify (Easiest)**
+Guided setup. Excellent documentation. Quick path to selling.
+
+**2. Square Online**
+Simple basics. Free tier. Local business focused.
+
+**3. Squarespace**
+Beautiful templates. Intuitive editor.
+
+**4. Wix**
+Drag-drop building. Content plus commerce.
+
+**5. BigCommerce**
+More features = more setup. Good documentation.
+
+**6. WooCommerce (Hardest)**
+WordPress setup, hosting, plugins. Technical users only.
+
+**Quick tips:**
+- Template near your vision
+- Fewer products to start
+- Skip over-customization
+- Done > perfect
+
+**Advice:** Shopify balances ease with power. Launch fast, grow later. Don't let setup stop you.""",
+
+"Which ecommerce platform has the best SEO features?": """SEO capabilities breakdown:
+
+**Maximum control:**
+
+**WooCommerce**
+- WordPress SEO foundation
+- Yoast/RankMath integration
+- Full technical access
+- Best blogging
+
+**Strong built-in:**
+
+**Shopify**
+- Clean URL structure
+- Auto sitemaps
+- Mobile optimized
+- Good speed
+
+**BigCommerce**
+- Comprehensive settings
+- Auto rich snippets
+- URL flexibility
+
+**Adequate:**
+
+**Wix** - Improved, some limits
+**Squarespace** - Clean, limited control
+
+**What actually matters:**
+1. Page speed
+2. Mobile experience
+3. Content quality
+4. User signals
+5. Backlinks
+
+**Reality:** Platform SEO is baseline. Basic sites outrank premium ones through better content and promotion.
+
+**Picks:** WooCommerce for control. Shopify/BigCommerce for most.""",
+
+"Which ecommerce platform is best for beginners?": """Beginner-friendly options balancing ease and growth:
+
+**Top pick: Shopify**
+- Clear interface
+- Guided setup
+- Great documentation
+- 24/7 support
+- Grows with you
+- Active community
+
+**Local focus: Square Online**
+- Free plan
+- Easy setup
+- In-person sync
+
+**Visual focus: Squarespace**
+- Best templates
+- Small catalogs
+- Design-first
+
+**Features: BigCommerce**
+- More built-in
+- No transaction fees
+- Scales well
+
+**Budget: Wix**
+- Lower cost
+- Drag-drop editor
+- Commerce improving
+
+**Beginners avoid:**
+- WooCommerce (technical)
+- Magento (complex)
+- Custom (expensive)
+
+**Start now:**
+1. Shopify trial
+2. Add 5-10 products
+3. Enable payments
+4. Launch this week
+5. Improve from feedback
+
+Best platform is one you'll use. Stop comparing, start selling.""",
+
+"Which is better, Shopify or WooCommerce?": """Shopify versus WooCommerce: managed versus self-managed.
+
+**Shopify:**
+Everything handled - hosting, security, updates. Monthly fees, minimal hassle.
+
+Cost: $29-79/month + apps
+Technical: Low
+Time: Minimal
+
+**WooCommerce:**
+Full control, full responsibility. You manage hosting, updates, security.
+
+Cost: $10-30/month
+Technical: WordPress needed
+Time: Moderate-high
+
+**Choose Shopify if:**
+- Hassle-free preferred
+- Not technical
+- 24/7 support wanted
+- Budget allows
+
+**Choose WooCommerce if:**
+- WordPress familiar
+- Control important
+- Technical resources exist
+- Lower costs preferred
+
+**Assessment:** If comparing, Shopify likely fits. WooCommerce users usually know they want it for technical reasons.
+
+Both power success. Products and marketing matter, not platform.""",
+
+"Which platform has the lowest transaction fees?": """Transaction fee comparison:
+
+**Zero platform fees:**
+
+1. **BigCommerce** - 0% always
+No additional fees regardless of processor.
+
+2. **WooCommerce** - 0% platform
+Processor fees only.
+
+3. **Shopify + Shopify Payments** - 0% extra
+Standard processing rates.
+
+4. **Squarespace Commerce** - 0%
+Lower tiers charge 3%.
+
+**Shopify consideration:**
+Shopify Payments: No extra
+Other processors: +0.5-2%
+
+**Processor rates:**
+- Stripe: 2.9% + 30 cents
+- PayPal: 3.49% + 49 cents
+- Square: 2.9% + 30 cents
+
+**$1,000 example:**
+- BigCommerce + Stripe: $29.30
+- Shopify + Shopify Payments: $29.30
+- Shopify + PayPal: $54.90
+
+**$100,000/year:**
+2% = $2,000 difference
+
+**Advice:**
+- Fee-sensitive: BigCommerce, WooCommerce
+- Using Shopify: Use Shopify Payments
+- High volume: Negotiate processor rates""",
+
+}
+
+# =============================================================================
+# OCTOBER RUN 2 RESPONSES (20 unique responses) - Wix in 10 queries (50%)
+# =============================================================================
+
+OCTOBER_RUN2_RESPONSES = {
+
+"How do I choose between Wix and Shopify?": """Wix versus Shopify - a 2025 perspective:
+
+**Wix makes sense when:**
+- Content and sales share importance
+- Design freedom matters
+- Product count is small
+- Flexibility in pricing helps
+
+**Shopify makes sense when:**
+- Commerce is the main purpose
+- Growth and scale are planned
+- Professional tools are required
+- Support availability is valued
+
+**Comparison:**
+- Creative control: Wix leads
+- Selling capability: Shopify leads
+- Cost: Comparable
+- Usability: Both approachable
+
+The fundamental split: Wix is web-first with commerce. Shopify is commerce-first with web features.""",
+
+"How do I start an online store?": """Getting your store online - practical steps:
+
+**Foundation:**
+Pick a platform - Shopify or Wix handle most needs. Get your domain. Keep initial ambitions modest.
+
+**Building:**
+Select a template matching your vision. Add your first products with solid photos. Configure payments.
+
+**Finishing:**
+Set up shipping. Create necessary pages. Test the full buying experience yourself.
+
+**Launch:**
+Go live with "good enough." Perfect comes later with real feedback.
+
+**Cost:** ~$35/month minimum to run properly.
+
+The common mistake is endless preparation. Start selling, then improve.""",
+
+"How does Shopify compare to other ecommerce platforms?": """Shopify's market position versus alternatives:
+
+**Versus WooCommerce**
+Shopify handles complexity for you. WooCommerce gives you control with work. Choose by your technical comfort.
+
+**Versus BigCommerce**
+Similar capabilities. BigCommerce includes more natively; Shopify extends via apps. BigCommerce avoids transaction fees.
+
+**Versus Squarespace**
+Squarespace wins on aesthetics. Shopify wins on commerce depth. Choose by priority.
+
+**Versus Magento**
+Magento for enterprises with developers. Shopify for everyone else.
+
+**Shopify strengths:**
+- App ecosystem
+- Community size
+- Reliability
+- POS integration
+
+**Shopify weaknesses:**
+- Payment processor fees
+- Basic blogging
+- App dependency
+
+Shopify sits in the middle - solid everywhere, specialized nowhere.""",
+
+"Is Shopify worth the price?": """Evaluating Shopify value:
+
+**Investment:**
+- Basic: $29/month
+- Shopify: $79/month
+- Advanced: $299/month
+- Apps: Add $20-100
+
+**Returns:**
+- Managed hosting
+- Security updates
+- 24/7 support
+- Payment processing
+- Professional look
+
+**Worth it if:**
+- Building seriously
+- Time has value
+- Reliability matters
+- Scaling expected
+
+**Maybe not if:**
+- Testing ideas
+- Low volume expected
+- WordPress experienced
+- Odd requirements
+
+**Break-even:** ~$1,500-2,000 annual profit justifies the cost.
+
+For serious merchants: worth it. For testers: start free elsewhere.""",
+
+"Is Squarespace good for selling products?": """Squarespace ecommerce assessment:
+
+**Positives:**
+- Gorgeous templates
+- Simple editing
+- Straightforward pricing
+- Visual product focus
+- Portfolio-shop combos
+
+**Negatives:**
+- Few payment options
+- Basic inventory
+- No dropshipping
+- Limited ecosystem
+- Restricted shipping
+
+**Good fit:**
+- Artists
+- Photographers
+- Small collections
+- Service add-ons
+- Compact catalogs
+
+**Poor fit:**
+- High volume
+- Dropshipping
+- Complex inventory
+- Multi-channel
+
+**Cost:** $27-49/month commerce plans
+
+Squarespace works when design sells and inventory stays simple. Otherwise, look at alternatives.""",
+
+"Should I use BigCommerce or Shopify for my store?": """BigCommerce or Shopify decision:
+
+**BigCommerce advantages:**
+- More native features
+- Zero transaction fees
+- B2B built-in
+- Unlimited staff
+- Product options
+
+**Shopify advantages:**
+- App selection
+- Community resources
+- Brand recognition
+- POS quality
+- Ecosystem
+
+**Comparison:**
+| | BigCommerce | Shopify |
+|---|-------------|---------|
+| Features | More built-in | App-based |
+| Fees | None | 0-2% |
+| B2B | Native | Via apps |
+| Apps | Good | Excellent |
+| Ease | Good | Slightly better |
+
+**Cost reality:** Both $29/month start, Shopify often requires paid apps.
+
+Trial both with your products. One usually fits your workflow better.""",
+
+"What are the best alternatives to WooCommerce?": """WooCommerce alternatives by reason:
+
+**Done with maintenance?**
+- Shopify: Fully managed
+- BigCommerce: Same benefits
+
+**Want easier editing?**
+- Squarespace: Clean and beautiful
+- Wix: Drag-and-drop ease
+
+**Staying open-source?**
+- PrestaShop: Standalone
+- OpenCart: Lightweight
+
+**Going enterprise?**
+- Magento: Powerful
+- Salesforce Commerce: Complete
+
+**Why people leave WooCommerce:**
+- Plugin issues
+- Security burden
+- Performance tuning
+- Support needs
+
+**Migration truth:**
+Platform changes are painful. Ensure necessity.
+
+**Common destination:** Shopify takes most WooCommerce migrants.""",
+
+"What ecommerce platform should I use for a small business?": """Small business platform advice:
+
+**Primary: Shopify ($29/month)**
+- Fully managed
+- Professional
+- Scalable
+- Supported
+
+**Budget: Square Online (Free-$29)**
+- Free tier
+- Local business
+- Simple
+
+**Technical: WooCommerce**
+- No platform fee
+- $10-20/month hosting
+- Hands-on
+
+**Easy start: Wix ($27/month)**
+- Affordable
+- Easy editing
+- Growing features
+
+**Avoid:**
+- Over-building early
+- Premium themes pre-revenue
+- App overload
+
+**Guidance:** Shopify Basic for most. Square Free or Wix if budget-tight. Platform shouldn't delay launching.""",
+
+"What ecommerce tools do I need to start selling online?": """Starting toolkit:
+
+**Essential:**
+- Platform (Shopify, Wix, WooCommerce, etc.)
+- Domain (~$12/year)
+- Payments (usually included)
+- Product photos
+
+**Month one adds:**
+- Email tool (Mailchimp free)
+- Analytics (Google)
+- Graphics (Canva free)
+
+**When volume demands:**
+- Shipping tools
+- Support software
+- Accounting
+- Scheduling
+
+**Costs:**
+- Platform: $29-39/month
+- Domain: ~$1/month
+- Email: Free
+- Minimum: ~$35/month
+
+**Mistakes:**
+- Over-tooling early
+- Premium too soon
+- Complexity before basics
+- Skipping email
+
+Minimal start. Add as needs emerge.""",
+
+"What is the best ecommerce platform in 2026?": """Platform picks by situation:
+
+**Most merchants: Shopify**
+Mainstream reliable. Small to large. Strong ecosystem.
+
+**Technical: WooCommerce**
+Full control. No monthly fee. Management required.
+
+**Design-focused: Squarespace**
+Best templates. Small catalogs.
+
+**B2B: BigCommerce**
+Wholesale features. No fees.
+
+**Beginners: Wix**
+Easiest entry. Growth room.
+
+**Criteria:**
+1. Technical comfort
+2. Commerce vs content
+3. Catalog size
+4. Budget
+5. Integrations
+
+**Simple:** If asking, Shopify is probably right. Good at everything, best at nothing specific. Deviate only with clear needs.""",
+
+"What platform do most successful online stores use?": """Platform distribution among successful stores:
+
+**By count:**
+- WooCommerce: ~36%
+- Shopify: ~26%
+- Others: Squarespace, BigCommerce, Magento
+
+**High-revenue:**
+Shopify dominates. Growth-focused merchants choose it. BigCommerce strong B2B.
+
+**More important than platform:**
+1. Product-market fit
+2. Customer acquisition
+3. Presentation
+4. Mobile experience
+5. Service quality
+6. Marketing
+
+**Success patterns:**
+- Clear value
+- Quality images
+- Simple checkout
+- Active marketing
+- Email building
+- Social proof
+
+**Reality:** Six-figure stores on basic platforms. Struggling stores on premium. Execution matters, not platform.""",
+
+"What platform should I use for dropshipping?": """Dropshipping platform requirements:
+
+**Best: Shopify**
+- Supplier integrations
+- Easy imports
+- Auto routing
+- Community
+- Tutorials
+
+**Budget: WooCommerce**
+- Lower costs
+- AliDropship
+- More setup
+- Technical users
+
+**Also: BigCommerce**
+- Integrations
+- No fees
+- Less community
+
+**Avoid:**
+- Squarespace (sync issues)
+- Etsy (against terms)
+
+**Success factors:**
+- Supplier > platform
+- Shipping times challenge
+- Service is yours
+- Volume needed
+
+**Start:**
+1. Shopify trial
+2. DSers free
+3. Test products
+4. Small ad test
+5. Evaluate first
+
+Niche and marketing trump platform.""",
+
+"What should I look for in an ecommerce platform?": """Platform evaluation:
+
+**Must-have:**
+
+1. **Skill fit** - Honest technical assessment
+2. **True cost** - All fees included
+3. **Payments** - Your processors work
+4. **Products** - Type supported
+
+**Important:**
+
+5. **Mobile** - Real device tests
+6. **SEO** - URLs, metadata
+7. **Shipping** - If physical
+8. **Support** - When needed
+9. **Growth** - Scale without migration
+
+**Red flags:**
+- No trial
+- Hidden fees
+- Bad mobile
+- Export limits
+- Slow updates
+
+**Process:**
+1. List needs
+2. Shortlist 2-3
+3. Trial all
+4. Test products
+5. Try checkout
+6. Contact support
+7. Decide
+
+Avoid paralysis. Execution matters more.""",
+
+"What's the best ecommerce platform for digital products?": """Digital product platforms:
+
+**Digital-focused: Gumroad**
+- Creator-built
+- Simple checkout
+- Auto delivery
+- Tax handling
+- Free tier
+
+**Courses: Teachable/Thinkific**
+- Education-specific
+- Tracking
+- Drip content
+- Certificates
+
+**Mixed: Shopify**
+- Physical + digital
+- Digital Downloads app
+- Professional
+
+**Control: WooCommerce**
+- Plugins
+- Ownership
+- No fees
+
+**Needed features:**
+- Auto delivery
+- Download limits
+- License keys
+- Streaming
+- Subscriptions
+
+**By product:**
+- Ebooks: Gumroad, Shopify
+- Courses: Teachable
+- Software: Gumroad
+- Music: Bandcamp
+
+Gumroad unless specific needs dictate.""",
+
+"What's the cheapest way to sell products online?": """Lowest cost options:
+
+**Free:**
+- Facebook/Instagram Shops: Fees only
+- Square Online Free: 2.9% + 30 cents
+- Big Cartel Free: 5 products
+
+**Very cheap ($5-15):**
+- Ecwid Starter
+- WooCommerce + hosting
+- Etsy (per listing)
+
+**Hidden "free" costs:**
+- Learning time
+- Problem solving
+- Limitations
+- Appearance
+
+**Calculation:**
+10 hours at $25 = $250 hidden cost
+
+**By situation:**
+- Testing: Square Free
+- Serious but broke: Square Free, upgrade later
+- Have $30: Wix or Shopify
+- Technical: WooCommerce
+
+Processor fees exist everywhere.""",
+
+"What's the easiest platform to set up an online shop?": """Setup ease ranking:
+
+**1. Shopify (Easiest)**
+Guided setup. Great docs. Fast launch.
+
+**2. Square Online**
+Simple. Free tier. Local focus.
+
+**3. Squarespace**
+Beautiful. Intuitive.
+
+**4. Wix**
+Drag-drop. Content plus commerce.
+
+**5. BigCommerce**
+More features = more setup.
+
+**6. WooCommerce (Hardest)**
+WordPress, hosting, plugins. Technical only.
+
+**Tips:**
+- Template near vision
+- Fewer products first
+- Skip over-customization
+- Done > perfect
+
+**Advice:** Shopify = ease plus capability. Launch quick, grow later.""",
+
+"Which ecommerce platform has the best SEO features?": """SEO capabilities:
+
+**Maximum control:**
+
+**WooCommerce**
+- WordPress SEO
+- Yoast/RankMath
+- Technical access
+- Blogging
+
+**Strong built-in:**
+
+**Shopify**
+- Clean URLs
+- Sitemaps
+- Mobile
+- Speed
+
+**BigCommerce**
+- SEO settings
+- Rich snippets
+- URL flexibility
+
+**Adequate:**
+
+**Wix** - Improved
+**Squarespace** - Clean
+
+**What matters:**
+1. Speed
+2. Mobile
+3. Content
+4. Signals
+5. Links
+
+**Truth:** Platform SEO is baseline. Content and promotion win.
+
+**Picks:** WooCommerce for control. Shopify/BigCommerce for most.""",
+
+"Which ecommerce platform is best for beginners?": """Beginner platforms:
+
+**Best: Shopify**
+- Clear interface
+- Guided setup
+- Documentation
+- 24/7 support
+- Scales
+- Community
+
+**Local: Square Online**
+- Free tier
+- Easy
+- In-person sync
+
+**Visual: Squarespace**
+- Templates
+- Small catalogs
+
+**Features: BigCommerce**
+- Built-in
+- No fees
+- Scales
+
+**Budget: Wix**
+- Lower cost
+- Drag-drop
+- Improving
+
+**Avoid:**
+- WooCommerce (technical)
+- Magento (complex)
+- Custom (expensive)
+
+**Action:**
+1. Shopify trial
+2. Add products
+3. Enable payments
+4. Launch week one
+5. Improve from feedback
+
+Stop comparing. Start selling.""",
+
+"Which is better, Shopify or WooCommerce?": """Shopify vs WooCommerce:
+
+**Shopify:**
+Managed - hosting, security, updates. Fees, minimal work.
+
+Cost: $29-79 + apps
+Technical: Low
+Time: Low
+
+**WooCommerce:**
+Control - you manage hosting, updates, security.
+
+Cost: $10-30
+Technical: WordPress
+Time: Moderate-high
+
+**Shopify if:**
+- Want hassle-free
+- Not technical
+- Support valued
+- Budget allows
+
+**WooCommerce if:**
+- Know WordPress
+- Need control
+- Have resources
+- Lower cost preferred
+
+**Truth:** If comparing, Shopify fits most. WooCommerce for technical users with specific needs.
+
+Both work. Products and marketing determine success.""",
+
+"Which platform has the lowest transaction fees?": """Fee comparison:
+
+**Zero platform fees:**
+
+1. **BigCommerce** - 0% always
+2. **WooCommerce** - 0% platform
+3. **Shopify + Shopify Payments** - 0% extra
+4. **Squarespace Commerce** - 0%
+
+**Shopify note:**
+Shopify Payments: 0% extra
+Other processors: +0.5-2%
+
+**Processor rates:**
+- Stripe: 2.9% + 30 cents
+- PayPal: 3.49% + 49 cents
+- Square: 2.9% + 30 cents
+
+**$1,000 sale:**
+- BigCommerce + Stripe: $29.30
+- Shopify + Shopify Payments: $29.30
+- Shopify + PayPal: $54.90
+
+**$100,000/year:**
+2% = $2,000
+
+**Advice:**
+- Fee-focused: BigCommerce, WooCommerce
+- Shopify: Use Shopify Payments
+- Volume: Negotiate""",
+
+}
 
 # =============================================================================
 # NOVEMBER RUN 1 RESPONSES (20 unique responses)
@@ -3185,32 +5761,114 @@ High volume → Negotiate rates""",
 
 
 def update_all_responses():
-    """Update all November and December prompts with unique responses."""
+    """Update all September, October, November and December prompts with unique responses."""
 
     with Session(engine) as session:
         all_prompts = session.exec(select(Prompt)).all()
+
+        # Check if September/October prompts exist, if not create them
+        sep_prompts = [p for p in all_prompts if p.scraped_at and p.scraped_at.strftime("%Y-%m") == "2025-09"]
+        oct_prompts = [p for p in all_prompts if p.scraped_at and p.scraped_at.strftime("%Y-%m") == "2025-10"]
+
+        # Get all 20 queries from an existing month
+        queries = list(SEPTEMBER_RUN1_RESPONSES.keys())
+
+        # Create September prompts if they don't exist
+        if len(sep_prompts) == 0:
+            print("Creating September 2025 prompts...")
+            for query in queries:
+                # Run 1 - September 15
+                p1 = Prompt(
+                    query=query,
+                    run_number=7,
+                    response_text=SEPTEMBER_RUN1_RESPONSES.get(query, ""),
+                    scraped_at=datetime(2025, 9, 15, 10, 0, 0)
+                )
+                session.add(p1)
+                # Run 2 - September 20
+                p2 = Prompt(
+                    query=query,
+                    run_number=8,
+                    response_text=SEPTEMBER_RUN2_RESPONSES.get(query, ""),
+                    scraped_at=datetime(2025, 9, 20, 14, 30, 0)
+                )
+                session.add(p2)
+            session.commit()
+            print(f"Created {len(queries) * 2} September prompts")
+            # Refresh prompts list
+            all_prompts = session.exec(select(Prompt)).all()
+            sep_prompts = [p for p in all_prompts if p.scraped_at and p.scraped_at.strftime("%Y-%m") == "2025-09"]
+
+        # Create October prompts if they don't exist
+        if len(oct_prompts) == 0:
+            print("Creating October 2025 prompts...")
+            for query in queries:
+                # Run 1 - October 15
+                p1 = Prompt(
+                    query=query,
+                    run_number=9,
+                    response_text=OCTOBER_RUN1_RESPONSES.get(query, ""),
+                    scraped_at=datetime(2025, 10, 15, 9, 0, 0)
+                )
+                session.add(p1)
+                # Run 2 - October 20
+                p2 = Prompt(
+                    query=query,
+                    run_number=10,
+                    response_text=OCTOBER_RUN2_RESPONSES.get(query, ""),
+                    scraped_at=datetime(2025, 10, 20, 16, 0, 0)
+                )
+                session.add(p2)
+            session.commit()
+            print(f"Created {len(queries) * 2} October prompts")
+            # Refresh prompts list
+            all_prompts = session.exec(select(Prompt)).all()
+            oct_prompts = [p for p in all_prompts if p.scraped_at and p.scraped_at.strftime("%Y-%m") == "2025-10"]
 
         # Group by month and run
         nov_prompts = [p for p in all_prompts if p.scraped_at and p.scraped_at.strftime("%Y-%m") == "2025-11"]
         dec_prompts = [p for p in all_prompts if p.scraped_at and p.scraped_at.strftime("%Y-%m") == "2025-12"]
 
-        # Determine run numbers
+        # Determine run numbers for each month
+        sep_run_numbers = sorted(set(p.run_number for p in sep_prompts))
+        oct_run_numbers = sorted(set(p.run_number for p in oct_prompts))
         nov_run_numbers = sorted(set(p.run_number for p in nov_prompts))
         dec_run_numbers = sorted(set(p.run_number for p in dec_prompts))
 
+        print(f"September run numbers: {sep_run_numbers}")
+        print(f"October run numbers: {oct_run_numbers}")
         print(f"November run numbers: {nov_run_numbers}")
         print(f"December run numbers: {dec_run_numbers}")
 
         # Map run numbers to response dictionaries
+        sep_run1_num = sep_run_numbers[0] if len(sep_run_numbers) > 0 else None
+        sep_run2_num = sep_run_numbers[1] if len(sep_run_numbers) > 1 else None
+        oct_run1_num = oct_run_numbers[0] if len(oct_run_numbers) > 0 else None
+        oct_run2_num = oct_run_numbers[1] if len(oct_run_numbers) > 1 else None
         nov_run1_num = nov_run_numbers[0] if len(nov_run_numbers) > 0 else None
         nov_run2_num = nov_run_numbers[1] if len(nov_run_numbers) > 1 else None
         dec_run1_num = dec_run_numbers[0] if len(dec_run_numbers) > 0 else None
         dec_run2_num = dec_run_numbers[1] if len(dec_run_numbers) > 1 else None
 
-        print(f"Mapping: Nov Run1={nov_run1_num}, Nov Run2={nov_run2_num}")
-        print(f"Mapping: Dec Run1={dec_run1_num}, Dec Run2={dec_run2_num}")
-
         updated_count = 0
+
+        # Update September prompts
+        for prompt in sep_prompts:
+            if prompt.run_number == sep_run1_num and prompt.query in SEPTEMBER_RUN1_RESPONSES:
+                prompt.response_text = SEPTEMBER_RUN1_RESPONSES[prompt.query]
+                updated_count += 1
+            elif prompt.run_number == sep_run2_num and prompt.query in SEPTEMBER_RUN2_RESPONSES:
+                prompt.response_text = SEPTEMBER_RUN2_RESPONSES[prompt.query]
+                updated_count += 1
+
+        # Update October prompts
+        for prompt in oct_prompts:
+            if prompt.run_number == oct_run1_num and prompt.query in OCTOBER_RUN1_RESPONSES:
+                prompt.response_text = OCTOBER_RUN1_RESPONSES[prompt.query]
+                updated_count += 1
+            elif prompt.run_number == oct_run2_num and prompt.query in OCTOBER_RUN2_RESPONSES:
+                prompt.response_text = OCTOBER_RUN2_RESPONSES[prompt.query]
+                updated_count += 1
 
         # Update November prompts
         for prompt in nov_prompts:
@@ -3234,10 +5892,15 @@ def update_all_responses():
 
         print(f"\nUpdated {updated_count} responses total")
 
-        # Verify
-        sample_nov = [p for p in nov_prompts if p.query == "How do I choose between Wix and Shopify?"]
-        for p in sample_nov:
-            print(f"\nNov Run {p.run_number} sample (first 100 chars):")
+        # Verify samples
+        sample_sep = [p for p in sep_prompts if p.query == "How do I choose between Wix and Shopify?"]
+        for p in sample_sep:
+            print(f"\nSep Run {p.run_number} sample (first 100 chars):")
+            print(p.response_text[:100] if p.response_text else "None")
+
+        sample_oct = [p for p in oct_prompts if p.query == "How do I choose between Wix and Shopify?"]
+        for p in sample_oct:
+            print(f"\nOct Run {p.run_number} sample (first 100 chars):")
             print(p.response_text[:100] if p.response_text else "None")
 
 
