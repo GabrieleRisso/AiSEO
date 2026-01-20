@@ -6,9 +6,9 @@ from datetime import datetime, timedelta
 from collections import Counter
 from itertools import groupby
 
-from .database import create_db_and_tables, get_session
-from .models import Brand, Prompt, PromptBrandMention, Source, PromptSource
-from .schemas import (
+from database import create_db_and_tables, get_session
+from models import Brand, Prompt, PromptBrandMention, Source, PromptSource
+from schemas import (
     BrandResponse,
     PromptResponse,
     PromptDetailResponse,
