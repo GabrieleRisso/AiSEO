@@ -56,7 +56,7 @@ def on_startup():
 def seed_brands():
     """Seed initial brand data if not exists"""
     from sqlmodel import Session
-    from .database import engine
+    from database import engine
 
     brands_data = [
         {"id": "wix", "name": "Wix", "type": "primary", "color": "#06b6d4"},
