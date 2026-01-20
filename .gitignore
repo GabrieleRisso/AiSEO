@@ -51,6 +51,13 @@ data/results/**/*.json
 data/screenshots/*.png
 data/sessions/
 
+# Backend backups (keep structure, ignore large files)
+backend/backups/*.json
+backend/backups/*.backup
+
+# Playwright MCP screenshots
+.playwright-mcp/
+
 # OS
 .DS_Store
 Thumbs.db

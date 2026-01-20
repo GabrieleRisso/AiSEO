@@ -1,88 +1,347 @@
-# AISEO Scraper
+# AiSEO - AI Search Engine Optimization Dashboard
 
-Google AI Mode scraper - extracts AI-generated responses and source citations from Google Search AI Mode (`udm=50`).
+Track your brand's visibility in AI-generated search results. AiSEO scrapes Google AI Mode responses, analyzes brand mentions and citation patterns, and provides actionable SEO insights through an interactive dashboard.
 
-## Features
+## Overview
 
-- Scrapes Google AI Mode responses (no login required)
-- Extracts AI-generated text (paragraphs, lists, tables)
-- Extracts all source citations with metadata (title, URL, date, description, publisher)
-- Uses undetected-chromedriver to avoid bot detection
-- Outputs structured JSON
+AiSEO is a full-stack application that:
 
-## Setup
+1. **Scrapes** Google AI Mode responses for e-commerce queries
+2. **Analyzes** which brands are mentioned and their positions
+3. **Tracks** citation sources used by AI systems
+4. **Visualizes** visibility trends over time in a dashboard
+5. **Suggests** SEO improvements based on data patterns
+
+## Architecture
+
+```
+┌──────────────────┐     ┌──────────────────┐     ┌──────────────────┐
+│     Frontend     │     │     Backend      │     │     Scraper      │
+│  React + Vite    │◄───►│  FastAPI + SQLite│◄───►│  undetected-     │
+│  TailwindCSS     │     │  SQLModel ORM    │     │  chromedriver    │
+└──────────────────┘     └──────────────────┘     └──────────────────┘
+        │                        │                        │
+        ▼                        ▼                        ▼
+   Dashboard UI            REST API (12          Google AI Mode
+   localhost:5173          endpoints)            (udm=50 param)
+                           localhost:8000
+```
+
+**Data Flow:**
+```
+Google AI Mode → Scraper → JSON files → Backend imports → SQLite DB → API → Dashboard
+```
+
+## Quick Start
+
+### Prerequisites
+
+- Python 3.11+
+- Node.js 18+
+- Google Chrome browser
+
+### 1. Backend Setup
 
 ```bash
-# Create virtual environment
+cd backend
+
+# Create and activate virtual environment
 python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
 
 # Install dependencies
-pip install -e .
+pip install -r requirements.txt
 
-# Copy environment config
+# Configure environment
 cp .env.example .env
+
+# Start the server
+uvicorn main:app --reload --port 8000
 ```
 
-## Usage
+API available at: http://localhost:8000
+API docs at: http://localhost:8000/docs
+
+### 2. Frontend Setup
 
 ```bash
-# Basic usage
-python scripts/scrape_google_ai.py "what is the best crm"
+cd frontend
 
-# With headless mode (no browser window)
-python scripts/scrape_google_ai.py "best project management software" --headless
+# Install dependencies
+npm install
 
-# With screenshot capture
-python scripts/scrape_google_ai.py "top email marketing tools" --screenshot
+# Configure environment
+cp .env.example .env
+
+# Start development server
+npm run dev
 ```
 
-## Output
+Dashboard available at: http://localhost:5173
 
-Results are saved to `data/results/google/` as JSON files:
+### 3. Running the Scraper
 
-```json
-{
-  "query": "what is the best crm",
-  "timestamp": "2026-01-16T14:43:43.295743+00:00",
-  "response_text": "- Zoho CRM: Best Overall...",
-  "sources": [
-    {
-      "title": "The Best CRM Software We've Tested for 2026 | PCMag",
-      "url": "https://www.pcmag.com/picks/the-best-crm-software",
-      "date": "5 Jan 2026",
-      "description": "Customer relationship management (CRM) systems...",
-      "publisher": "Pcmag"
-    }
-  ],
-  "source_count": 15,
-  "success": true
-}
+```bash
+# From project root (with venv activated)
+
+# Basic scrape
+python scripts/scrape_google_ai.py "best ecommerce platform"
+
+# Headless mode (no browser window)
+python scripts/scrape_google_ai.py "best ecommerce platform" --headless
+
+# With debug screenshots
+python scripts/scrape_google_ai.py "best ecommerce platform" --screenshot
 ```
+
+Results saved to: `data/results/google/{query}.json`
+
+## Database Schema
+
+### Entity Relationship Diagram
+
+```
+┌─────────────┐       ┌─────────────────────┐       ┌─────────────┐
+│   Brand     │       │ PromptBrandMention  │       │   Prompt    │
+├─────────────┤       ├─────────────────────┤       ├─────────────┤
+│ id (PK)     │◄──────│ brand_id (FK)       │       │ id (PK)     │
+│ name        │       │ prompt_id (FK)      │──────►│ query       │
+│ type        │       │ mentioned           │       │ run_number  │
+│ color       │       │ position            │       │ response_txt│
+│ variations  │       │ sentiment           │       │ scraped_at  │
+└─────────────┘       │ context             │       └─────────────┘
+                      └─────────────────────┘              │
+                                                           │
+┌─────────────┐       ┌─────────────────────┐              │
+│   Source    │       │    PromptSource     │              │
+├─────────────┤       ├─────────────────────┤              │
+│ id (PK)     │◄──────│ source_id (FK)      │              │
+│ domain      │       │ prompt_id (FK)      │──────────────┘
+│ url (unique)│       │ citation_order      │
+│ title       │       └─────────────────────┘
+│ description │
+│ published_dt│
+└─────────────┘
+```
+
+### Tables
+
+| Table | Description | Key Fields |
+|-------|-------------|------------|
+| **Brand** | Tracked brands (1 primary + competitors) | `id`, `name`, `type` (primary/competitor), `color`, `variations` |
+| **Prompt** | Scraped query results | `query`, `run_number`, `response_text`, `scraped_at` |
+| **PromptBrandMention** | Brand mentions per prompt | `position` (1=first), `sentiment`, `mentioned` (bool), `context` |
+| **Source** | Cited websites | `domain`, `url` (unique), `title`, `description`, `published_date` |
+| **PromptSource** | Links prompts to sources | `citation_order` |
+
+### Tracked Brands (Default)
+
+| Brand | Type | Color | Purpose |
+|-------|------|-------|---------|
+| Wix | primary | Cyan | Your brand (visibility focus) |
+| Shopify | competitor | Amber | Main competitor |
+| WooCommerce | competitor | Purple | Open-source competitor |
+| BigCommerce | competitor | Pink | Enterprise competitor |
+| Squarespace | competitor | Emerald | Design-focused competitor |
+
+## API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/health` | GET | Health check |
+| `/api/brands` | GET | List all brands with visibility metrics |
+| `/api/brands/details` | GET | Detailed brand analytics with monthly breakdown |
+| `/api/brands` | POST | Create new brand (auto-syncs mentions) |
+| `/api/brands/{id}` | DELETE | Delete brand and all mentions |
+| `/api/prompts` | GET | List prompts with aggregated stats |
+| `/api/prompts/{id}` | GET | Prompt detail with all runs |
+| `/api/sources` | GET | List sources with usage metrics |
+| `/api/sources/analytics` | GET | Detailed source analytics (types, domains) |
+| `/api/metrics` | GET | Dashboard KPIs (visibility, position, counts) |
+| `/api/visibility` | GET | Monthly visibility data for charts |
+| `/api/suggestions` | GET | AI SEO improvement suggestions |
 
 ## Project Structure
 
 ```
 AiSEO/
-├── src/
-│   ├── config/
-│   │   └── settings.py      # Configuration
+├── backend/                      # FastAPI backend
+│   ├── main.py                   # API endpoints (1200+ lines)
+│   ├── models.py                 # SQLModel ORM models
+│   ├── schemas.py                # Pydantic response schemas
+│   ├── database.py               # DB connection and init
+│   ├── requirements.txt          # Python dependencies
+│   ├── .env.example              # Environment template
+│   ├── aiseo.db                  # SQLite database
+│   ├── scripts/                  # Utility scripts (see scripts/README.md)
+│   │   ├── seed_data.py          # Initial data seeding
+│   │   ├── sync_brand_mentions.py # Re-sync brand detection
+│   │   └── ...                   # Historical data scripts
+│   └── backups/                  # Database exports
+│       ├── database_export.json
+│       └── aiseo.db.backup
+│
+├── frontend/                     # React dashboard
+│   ├── src/
+│   │   ├── App.tsx               # Main app component
+│   │   ├── config.ts             # API configuration
+│   │   ├── api/client.ts         # API client
+│   │   ├── types/index.ts        # TypeScript interfaces
+│   │   ├── pages/                # Route pages (6)
+│   │   │   ├── Dashboard.tsx     # Main metrics dashboard
+│   │   │   ├── Brands.tsx        # Brand management
+│   │   │   ├── Prompts.tsx       # Query library
+│   │   │   ├── Sources.tsx       # Citation analysis
+│   │   │   ├── Suggestions.tsx   # SEO recommendations
+│   │   │   └── Settings.tsx      # App settings
+│   │   ├── components/           # Reusable components
+│   │   │   ├── layout/           # Header, Sidebar, MobileNav
+│   │   │   ├── ui/               # MetricCard, DataTable, Modal, Toast
+│   │   │   ├── charts/           # VisibilityChart, BrandComparison
+│   │   │   └── search/           # GlobalSearch, SearchResults
+│   │   └── hooks/                # Custom React hooks (7)
+│   ├── package.json
+│   └── vite.config.ts
+│
+├── src/                          # Scraper library
 │   ├── scrapers/
-│   │   └── google_ai_scraper.py  # Main scraper
-│   └── utils/
-│       ├── exceptions.py    # Custom exceptions
-│       └── logger.py        # Logging setup
+│   │   └── google_ai_scraper.py  # Main Google AI scraper
+│   ├── config/settings.py        # Pydantic settings
+│   └── utils/                    # Logger, exceptions
+│
 ├── scripts/
-│   └── scrape_google_ai.py  # CLI entry point
-├── data/
-│   ├── results/
-│   │   └── google/          # Google AI Mode results
-│   └── screenshots/         # Debug screenshots
-├── pyproject.toml
-└── .env.example
+│   └── scrape_google_ai.py       # CLI entry point
+│
+├── data/                         # Runtime data
+│   ├── results/google/           # Scrape results (JSON)
+│   └── screenshots/              # Debug screenshots
+│
+├── tests/                        # Test suites (empty)
+├── pyproject.toml                # Python project config
+└── .env.example                  # Root environment template
 ```
 
-## Requirements
+## Environment Variables
 
-- Python 3.11+
-- Google Chrome browser installed
+### Root `.env` (Scraper)
+
+```bash
+BROWSER_HEADLESS=false           # Show browser window during scrape
+BROWSER_TIMEOUT_SECONDS=60       # Page load timeout
+SCRAPER_TAKE_SCREENSHOTS=false   # Capture debug screenshots
+LOG_LEVEL=INFO
+```
+
+### Backend `backend/.env`
+
+```bash
+CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173  # Allowed origins
+DATABASE_URL=                    # Optional: PostgreSQL connection string
+LOG_LEVEL=INFO
+DEBUG=false
+```
+
+### Frontend `frontend/.env`
+
+```bash
+VITE_API_BASE_URL=http://localhost:8000/api  # Backend API URL
+```
+
+## Key Concepts
+
+### Visibility Score
+
+Percentage of tracked queries where your brand is mentioned in the AI response.
+
+```
+Visibility = (queries_with_mention / total_queries) × 100
+```
+
+Position affects the visibility contribution:
+- Position 1 (first mentioned) = 100%
+- Position 2 = 80%
+- Position 3 = 60%
+- And so on...
+
+### Sentiment Analysis
+
+Brand mentions are classified as:
+- **Positive**: Contains words like "excellent", "powerful", "recommended", "best"
+- **Negative**: Contains words like "limited", "expensive", "complicated", "lacks"
+- **Neutral**: Default when no sentiment keywords detected
+
+### Source Classification
+
+Cited sources are automatically categorized:
+- **Brand**: Official brand sites (shopify.com, wix.com)
+- **Blog**: Contains `/blog/` in URL, Medium, Dev.to
+- **Community**: Reddit, Quora, Stack Exchange
+- **News**: Forbes, TechCrunch, BusinessInsider
+- **Review**: G2, Capterra, Trustpilot
+- **Other**: Uncategorized
+
+### Run (Multiple Scrapes)
+
+The same query can be scraped multiple times to track changes:
+- `run_number`: 1, 2, 3, etc.
+- Allows trend analysis over time
+- Dashboard aggregates across runs
+
+## Tech Stack
+
+| Layer | Technologies |
+|-------|-------------|
+| **Frontend** | React 19, TypeScript, Vite, TailwindCSS 4, Recharts, React Router 7 |
+| **Backend** | FastAPI, SQLModel (Pydantic + SQLAlchemy), SQLite, Uvicorn |
+| **Scraper** | undetected-chromedriver, Selenium, BeautifulSoup |
+| **Styling** | Dark "Data Observatory" theme, CSS variables, Glassmorphism |
+
+## Development
+
+### Adding a New Brand
+
+1. POST to `/api/brands`:
+```json
+{
+  "id": "magento",
+  "name": "Magento",
+  "type": "competitor",
+  "color": "#f97316",
+  "variations": ["Magento", "Adobe Commerce", "magento.com"]
+}
+```
+
+2. System automatically scans all existing prompts for mentions
+
+### Running Utility Scripts
+
+See `backend/scripts/README.md` for data management scripts.
+
+### Building for Production
+
+```bash
+# Frontend build
+cd frontend
+npm run build
+# Output: frontend/dist/
+
+# Backend
+# Use gunicorn or similar for production
+gunicorn main:app -w 4 -k uvicorn.workers.UvicornWorker
+```
+
+## Scraper Details
+
+The Google AI Mode scraper (`src/scrapers/google_ai_scraper.py`):
+
+1. Uses `undetected-chromedriver` to avoid bot detection
+2. Navigates to `google.com/search?udm=50&q={query}` (AI Mode)
+3. Handles cookie consent dialogs automatically
+4. Waits for AI response to generate (up to 60s)
+5. Extracts response text (headings, lists, tables)
+6. Extracts all source citations with metadata
+7. Saves structured JSON to `data/results/google/`
+
+## License
+
+MIT
