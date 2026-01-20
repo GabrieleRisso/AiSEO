@@ -183,3 +183,74 @@ export async function fetchSourcesAnalytics(): Promise<SourcesAnalyticsResponse>
 export async function fetchSuggestions(): Promise<SuggestionsDataResponse> {
   return fetchJson<SuggestionsDataResponse>('/suggestions');
 }
+
+// Brand Management types
+export interface BrandPromptDetailResponse {
+  query: string;
+  position: number | null;
+  sentiment: string | null;
+  scrapedAt: string;
+}
+
+export interface BrandMonthlyVisibilityResponse {
+  month: string;
+  visibility: number;
+}
+
+export interface BrandDetailResponse {
+  id: string;
+  name: string;
+  type: string;
+  color: string;
+  variations: string[];
+  visibility: number;
+  avgPosition: number;
+  trend: string;
+  sentiment: string;
+  totalMentions: number;
+  totalPrompts: number;
+  topPrompts: BrandPromptDetailResponse[];
+  visibilityByMonth: BrandMonthlyVisibilityResponse[];
+}
+
+export interface BrandsListResponse {
+  brands: BrandDetailResponse[];
+}
+
+export interface BrandCreateRequest {
+  id: string;
+  name: string;
+  type: string;
+  color: string;
+  variations: string[];
+}
+
+export async function fetchBrandsDetails(): Promise<BrandsListResponse> {
+  return fetchJson<BrandsListResponse>('/brands/details');
+}
+
+export async function createBrand(brand: BrandCreateRequest): Promise<BrandDetailResponse> {
+  const response = await fetch(`${API_BASE}/brands`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(brand),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || `API error: ${response.status}`);
+  }
+  return response.json();
+}
+
+export async function deleteBrand(brandId: string): Promise<{ success: boolean; message: string }> {
+  const response = await fetch(`${API_BASE}/brands/${brandId}`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || `API error: ${response.status}`);
+  }
+  return response.json();
+}

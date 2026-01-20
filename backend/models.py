@@ -9,6 +9,7 @@ class Brand(SQLModel, table=True):
     name: str
     type: str = "competitor"  # 'primary' or 'competitor'
     color: str
+    variations: str | None = None  # Comma-separated search terms (e.g., "Shopify,shopify.com")
 
     # Relationships
     mentions: list["PromptBrandMention"] = Relationship(back_populates="brand")

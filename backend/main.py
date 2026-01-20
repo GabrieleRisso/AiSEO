@@ -26,6 +26,11 @@ from .schemas import (
     SuggestionsResponse,
     Suggestion,
     SuggestionExample,
+    BrandCreate,
+    BrandDetailResponse,
+    BrandListResponse,
+    BrandPromptDetail,
+    BrandMonthlyVisibility,
 )
 
 app = FastAPI(title="AiSEO API", version="1.0.0")
@@ -213,6 +218,396 @@ def get_brands(session: Session = Depends(get_session)):
     # Sort: primary brand first, then by visibility descending
     result.sort(key=lambda x: (x.type != "primary", -x.visibility))
     return result
+
+
+@app.get("/api/brands/details", response_model=BrandListResponse)
+def get_brands_details(session: Session = Depends(get_session)):
+    """Get detailed brand analytics for brand management page"""
+    brands = session.exec(select(Brand)).all()
+    all_prompts = session.exec(select(Prompt)).all()
+
+    # Group prompts by month
+    months_order = ["Sep 2025", "Oct 2025", "Nov 2025", "Dec 2025", "Jan 2026"]
+    month_map = {
+        "2025-09": "Sep 2025",
+        "2025-10": "Oct 2025",
+        "2025-11": "Nov 2025",
+        "2025-12": "Dec 2025",
+        "2026-01": "Jan 2026",
+    }
+
+    prompts_by_month = {m: [] for m in months_order}
+    for prompt in all_prompts:
+        if prompt.scraped_at:
+            month_key = prompt.scraped_at.strftime("%Y-%m")
+            if month_key in month_map:
+                prompts_by_month[month_map[month_key]].append(prompt)
+
+    # January prompts for current stats
+    jan_prompts = prompts_by_month.get("Jan 2026", [])
+    dec_prompts = prompts_by_month.get("Dec 2025", [])
+    jan_queries = set(p.query for p in jan_prompts)
+    dec_queries = set(p.query for p in dec_prompts)
+
+    result = []
+    for brand in brands:
+        # Parse variations
+        variations = brand.variations.split(",") if brand.variations else [brand.name]
+        variations = [v.strip() for v in variations if v.strip()]
+
+        # Get January mentions for current stats
+        jan_mentioned_queries = set()
+        jan_positions = []
+        jan_sentiments = []
+        top_prompts = []
+
+        for prompt in jan_prompts:
+            mention = session.exec(
+                select(PromptBrandMention).where(
+                    PromptBrandMention.prompt_id == prompt.id,
+                    PromptBrandMention.brand_id == brand.id,
+                    PromptBrandMention.mentioned == True,
+                )
+            ).first()
+            if mention:
+                jan_mentioned_queries.add(prompt.query)
+                if mention.position:
+                    jan_positions.append(mention.position)
+                if mention.sentiment:
+                    jan_sentiments.append(mention.sentiment)
+                top_prompts.append(BrandPromptDetail(
+                    query=prompt.query,
+                    position=mention.position,
+                    sentiment=mention.sentiment,
+                    scrapedAt=prompt.scraped_at.isoformat() if prompt.scraped_at else ""
+                ))
+
+        # Deduplicate top_prompts by query, keep best position
+        unique_prompts = {}
+        for tp in top_prompts:
+            if tp.query not in unique_prompts or (tp.position and (not unique_prompts[tp.query].position or tp.position < unique_prompts[tp.query].position)):
+                unique_prompts[tp.query] = tp
+        top_prompts = sorted(unique_prompts.values(), key=lambda x: x.position if x.position else 999)[:10]
+
+        jan_visibility = (len(jan_mentioned_queries) / len(jan_queries) * 100) if jan_queries else 0
+        avg_position = sum(jan_positions) / len(jan_positions) if jan_positions else 0
+        most_common_sentiment = Counter(jan_sentiments).most_common(1)[0][0] if jan_sentiments else "neutral"
+
+        # Calculate December visibility for trend
+        dec_mentioned_queries = set()
+        for prompt in dec_prompts:
+            mention = session.exec(
+                select(PromptBrandMention).where(
+                    PromptBrandMention.prompt_id == prompt.id,
+                    PromptBrandMention.brand_id == brand.id,
+                    PromptBrandMention.mentioned == True,
+                )
+            ).first()
+            if mention:
+                dec_mentioned_queries.add(prompt.query)
+
+        dec_visibility = (len(dec_mentioned_queries) / len(dec_queries) * 100) if dec_queries else 0
+
+        trend = "stable"
+        if jan_visibility > dec_visibility + 2:
+            trend = "up"
+        elif jan_visibility < dec_visibility - 2:
+            trend = "down"
+
+        # Calculate visibility by month
+        visibility_by_month = []
+        for month_name in months_order:
+            month_prompts = prompts_by_month.get(month_name, [])
+            month_queries = set(p.query for p in month_prompts)
+
+            mentioned_queries = set()
+            for prompt in month_prompts:
+                mention = session.exec(
+                    select(PromptBrandMention).where(
+                        PromptBrandMention.prompt_id == prompt.id,
+                        PromptBrandMention.brand_id == brand.id,
+                        PromptBrandMention.mentioned == True,
+                    )
+                ).first()
+                if mention:
+                    mentioned_queries.add(prompt.query)
+
+            month_visibility = (len(mentioned_queries) / len(month_queries) * 100) if month_queries else 0
+            visibility_by_month.append(BrandMonthlyVisibility(
+                month=month_name,
+                visibility=round(month_visibility, 1)
+            ))
+
+        # Count total mentions across all time
+        total_mentions = session.exec(
+            select(func.count(PromptBrandMention.id)).where(
+                PromptBrandMention.brand_id == brand.id,
+                PromptBrandMention.mentioned == True,
+            )
+        ).one()
+
+        result.append(BrandDetailResponse(
+            id=brand.id,
+            name=brand.name,
+            type=brand.type,
+            color=brand.color,
+            variations=variations,
+            visibility=round(jan_visibility, 1),
+            avgPosition=round(avg_position, 1),
+            trend=trend,
+            sentiment=most_common_sentiment,
+            totalMentions=total_mentions,
+            totalPrompts=len(jan_mentioned_queries),
+            topPrompts=top_prompts,
+            visibilityByMonth=visibility_by_month
+        ))
+
+    # Sort: primary brand first, then by visibility descending
+    result.sort(key=lambda x: (x.type != "primary", -x.visibility))
+    return BrandListResponse(brands=result)
+
+
+@app.post("/api/brands", response_model=BrandDetailResponse)
+def create_brand(brand_data: BrandCreate, session: Session = Depends(get_session)):
+    """Create a new brand and sync mentions from existing prompts"""
+    import re
+
+    # Check if brand already exists
+    existing = session.get(Brand, brand_data.id)
+    if existing:
+        raise HTTPException(status_code=400, detail=f"Brand with ID '{brand_data.id}' already exists")
+
+    # Create the brand
+    variations_str = ",".join(brand_data.variations) if brand_data.variations else brand_data.name
+    new_brand = Brand(
+        id=brand_data.id,
+        name=brand_data.name,
+        type=brand_data.type,
+        color=brand_data.color,
+        variations=variations_str
+    )
+    session.add(new_brand)
+    session.commit()
+    session.refresh(new_brand)
+
+    # Sync mentions for all existing prompts
+    all_prompts = session.exec(select(Prompt)).all()
+    search_terms = brand_data.variations if brand_data.variations else [brand_data.name]
+
+    for prompt in all_prompts:
+        if not prompt.response_text:
+            continue
+
+        response_lower = prompt.response_text.lower()
+
+        # Check if any variation is mentioned
+        mentioned = False
+        position = None
+        context = None
+
+        for term in search_terms:
+            if term.lower() in response_lower:
+                mentioned = True
+                # Find position (simple: count newlines before first mention)
+                idx = response_lower.find(term.lower())
+                # Estimate position by checking for numbered lists or paragraph position
+                before_text = response_lower[:idx]
+                # Count how many other brands appear before
+                brands = session.exec(select(Brand)).all()
+                other_brands_before = 0
+                for b in brands:
+                    b_variations = b.variations.split(",") if b.variations else [b.name]
+                    for bv in b_variations:
+                        bv_idx = response_lower.find(bv.lower())
+                        if 0 <= bv_idx < idx:
+                            other_brands_before += 1
+                            break
+                position = other_brands_before + 1
+
+                # Extract context (50 chars before and after)
+                start = max(0, idx - 50)
+                end = min(len(prompt.response_text), idx + len(term) + 50)
+                context = prompt.response_text[start:end]
+                break
+
+        # Create mention record
+        mention = PromptBrandMention(
+            prompt_id=prompt.id,
+            brand_id=new_brand.id,
+            mentioned=mentioned,
+            position=position if mentioned else None,
+            sentiment="neutral",  # Default sentiment
+            context=context
+        )
+        session.add(mention)
+
+    session.commit()
+
+    # Return the brand details
+    return get_brand_detail(new_brand.id, session)
+
+
+def get_brand_detail(brand_id: str, session: Session) -> BrandDetailResponse:
+    """Helper to get brand detail response"""
+    brand = session.get(Brand, brand_id)
+    if not brand:
+        raise HTTPException(status_code=404, detail="Brand not found")
+
+    all_prompts = session.exec(select(Prompt)).all()
+
+    # January prompts
+    jan_prompts = [p for p in all_prompts if p.scraped_at and p.scraped_at.strftime("%Y-%m") == "2026-01"]
+    dec_prompts = [p for p in all_prompts if p.scraped_at and p.scraped_at.strftime("%Y-%m") == "2025-12"]
+    jan_queries = set(p.query for p in jan_prompts)
+    dec_queries = set(p.query for p in dec_prompts)
+
+    variations = brand.variations.split(",") if brand.variations else [brand.name]
+    variations = [v.strip() for v in variations if v.strip()]
+
+    # Get January mentions
+    jan_mentioned_queries = set()
+    jan_positions = []
+    jan_sentiments = []
+    top_prompts = []
+
+    for prompt in jan_prompts:
+        mention = session.exec(
+            select(PromptBrandMention).where(
+                PromptBrandMention.prompt_id == prompt.id,
+                PromptBrandMention.brand_id == brand.id,
+                PromptBrandMention.mentioned == True,
+            )
+        ).first()
+        if mention:
+            jan_mentioned_queries.add(prompt.query)
+            if mention.position:
+                jan_positions.append(mention.position)
+            if mention.sentiment:
+                jan_sentiments.append(mention.sentiment)
+            top_prompts.append(BrandPromptDetail(
+                query=prompt.query,
+                position=mention.position,
+                sentiment=mention.sentiment,
+                scrapedAt=prompt.scraped_at.isoformat() if prompt.scraped_at else ""
+            ))
+
+    unique_prompts = {}
+    for tp in top_prompts:
+        if tp.query not in unique_prompts or (tp.position and (not unique_prompts[tp.query].position or tp.position < unique_prompts[tp.query].position)):
+            unique_prompts[tp.query] = tp
+    top_prompts = sorted(unique_prompts.values(), key=lambda x: x.position if x.position else 999)[:10]
+
+    jan_visibility = (len(jan_mentioned_queries) / len(jan_queries) * 100) if jan_queries else 0
+    avg_position = sum(jan_positions) / len(jan_positions) if jan_positions else 0
+    most_common_sentiment = Counter(jan_sentiments).most_common(1)[0][0] if jan_sentiments else "neutral"
+
+    dec_mentioned_queries = set()
+    for prompt in dec_prompts:
+        mention = session.exec(
+            select(PromptBrandMention).where(
+                PromptBrandMention.prompt_id == prompt.id,
+                PromptBrandMention.brand_id == brand.id,
+                PromptBrandMention.mentioned == True,
+            )
+        ).first()
+        if mention:
+            dec_mentioned_queries.add(prompt.query)
+
+    dec_visibility = (len(dec_mentioned_queries) / len(dec_queries) * 100) if dec_queries else 0
+
+    trend = "stable"
+    if jan_visibility > dec_visibility + 2:
+        trend = "up"
+    elif jan_visibility < dec_visibility - 2:
+        trend = "down"
+
+    # Visibility by month
+    months_order = ["Sep 2025", "Oct 2025", "Nov 2025", "Dec 2025", "Jan 2026"]
+    month_map = {
+        "2025-09": "Sep 2025",
+        "2025-10": "Oct 2025",
+        "2025-11": "Nov 2025",
+        "2025-12": "Dec 2025",
+        "2026-01": "Jan 2026",
+    }
+
+    prompts_by_month = {m: [] for m in months_order}
+    for prompt in all_prompts:
+        if prompt.scraped_at:
+            month_key = prompt.scraped_at.strftime("%Y-%m")
+            if month_key in month_map:
+                prompts_by_month[month_map[month_key]].append(prompt)
+
+    visibility_by_month = []
+    for month_name in months_order:
+        month_prompts = prompts_by_month.get(month_name, [])
+        month_queries = set(p.query for p in month_prompts)
+
+        mentioned_queries = set()
+        for prompt in month_prompts:
+            mention = session.exec(
+                select(PromptBrandMention).where(
+                    PromptBrandMention.prompt_id == prompt.id,
+                    PromptBrandMention.brand_id == brand.id,
+                    PromptBrandMention.mentioned == True,
+                )
+            ).first()
+            if mention:
+                mentioned_queries.add(prompt.query)
+
+        month_visibility = (len(mentioned_queries) / len(month_queries) * 100) if month_queries else 0
+        visibility_by_month.append(BrandMonthlyVisibility(
+            month=month_name,
+            visibility=round(month_visibility, 1)
+        ))
+
+    total_mentions = session.exec(
+        select(func.count(PromptBrandMention.id)).where(
+            PromptBrandMention.brand_id == brand.id,
+            PromptBrandMention.mentioned == True,
+        )
+    ).one()
+
+    return BrandDetailResponse(
+        id=brand.id,
+        name=brand.name,
+        type=brand.type,
+        color=brand.color,
+        variations=variations,
+        visibility=round(jan_visibility, 1),
+        avgPosition=round(avg_position, 1),
+        trend=trend,
+        sentiment=most_common_sentiment,
+        totalMentions=total_mentions,
+        totalPrompts=len(jan_mentioned_queries),
+        topPrompts=top_prompts,
+        visibilityByMonth=visibility_by_month
+    )
+
+
+@app.delete("/api/brands/{brand_id}")
+def delete_brand(brand_id: str, session: Session = Depends(get_session)):
+    """Delete a brand and all its mentions"""
+    brand = session.get(Brand, brand_id)
+    if not brand:
+        raise HTTPException(status_code=404, detail="Brand not found")
+
+    # Prevent deleting primary brand
+    if brand.type == "primary":
+        raise HTTPException(status_code=400, detail="Cannot delete primary brand")
+
+    # Delete all mentions for this brand
+    mentions = session.exec(
+        select(PromptBrandMention).where(PromptBrandMention.brand_id == brand_id)
+    ).all()
+    for mention in mentions:
+        session.delete(mention)
+
+    # Delete the brand
+    session.delete(brand)
+    session.commit()
+
+    return {"success": True, "message": f"Brand '{brand_id}' deleted successfully"}
 
 
 @app.get("/api/prompts", response_model=list[PromptResponse])

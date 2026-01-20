@@ -360,12 +360,22 @@ export function Prompts() {
   const { data: prompts, loading: promptsLoading, error: promptsError } = usePrompts();
   const { data: brandsData, loading: brandsLoading } = useBrands();
 
-  // Auto-expand prompt from URL highlight parameter
+  // Auto-expand prompt from URL parameters
   useEffect(() => {
     const highlightId = searchParams.get('highlight');
+    const queryText = searchParams.get('query');
+
     if (highlightId && prompts) {
       setExpandedId(highlightId);
-      // Clear the highlight param from URL after using it
+      setSearchParams({}, { replace: true });
+    } else if (queryText && prompts) {
+      // Find prompt by query text and expand it
+      const matchingPrompt = prompts.find(
+        p => p.query.toLowerCase() === queryText.toLowerCase()
+      );
+      if (matchingPrompt) {
+        setExpandedId(matchingPrompt.id);
+      }
       setSearchParams({}, { replace: true });
     }
   }, [searchParams, prompts, setSearchParams]);

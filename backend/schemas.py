@@ -163,3 +163,49 @@ class SuggestionsResponse(BaseModel):
     """Suggestions with overall score"""
     score: int
     suggestions: list[Suggestion]
+
+
+# Brand Management schemas
+class BrandCreate(BaseModel):
+    """Create a new brand"""
+    id: str  # lowercase, no spaces (e.g., "adobe-commerce")
+    name: str
+    type: str = "competitor"  # 'primary' or 'competitor'
+    color: str
+    variations: list[str] = []  # Search terms: ["Adobe Commerce", "Magento"]
+
+
+class BrandPromptDetail(BaseModel):
+    """Prompt detail for brand analytics"""
+    query: str
+    position: int | None
+    sentiment: str | None
+    scrapedAt: str
+
+
+class BrandMonthlyVisibility(BaseModel):
+    """Monthly visibility data for brand"""
+    month: str
+    visibility: float
+
+
+class BrandDetailResponse(BaseModel):
+    """Detailed brand analytics"""
+    id: str
+    name: str
+    type: str
+    color: str
+    variations: list[str]
+    visibility: float
+    avgPosition: float
+    trend: str
+    sentiment: str
+    totalMentions: int
+    totalPrompts: int
+    topPrompts: list[BrandPromptDetail]
+    visibilityByMonth: list[BrandMonthlyVisibility]
+
+
+class BrandListResponse(BaseModel):
+    """List of all brands with details"""
+    brands: list[BrandDetailResponse]

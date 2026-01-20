@@ -123,3 +123,44 @@ export interface SuggestionsData {
   score: number;
   suggestions: Suggestion[];
 }
+
+// Brand Management types
+export interface BrandPromptDetail {
+  query: string;
+  position: number | null;
+  sentiment: string | null;
+  scrapedAt: string;
+}
+
+export interface BrandMonthlyVisibility {
+  month: string;
+  visibility: number;
+}
+
+export interface BrandDetail {
+  id: string;
+  name: string;
+  type: 'primary' | 'competitor';
+  color: string;
+  variations: string[];
+  visibility: number;
+  avgPosition: number;
+  trend: 'up' | 'down' | 'stable';
+  sentiment: 'positive' | 'neutral' | 'negative';
+  totalMentions: number;
+  totalPrompts: number;
+  topPrompts: BrandPromptDetail[];
+  visibilityByMonth: BrandMonthlyVisibility[];
+}
+
+export interface BrandCreate {
+  id: string;
+  name: string;
+  type: 'primary' | 'competitor';
+  color: string;
+  variations: string[];
+}
+
+export interface BrandsListData {
+  brands: BrandDetail[];
+}

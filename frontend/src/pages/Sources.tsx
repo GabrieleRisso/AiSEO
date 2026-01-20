@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router';
 import { Globe, Database, Link2, BarChart3, Loader2, ChevronDown, ChevronRight, ExternalLink } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { Header } from '../components/layout/Header';
@@ -29,7 +30,10 @@ interface ExpandedSources {
 
 export function Sources() {
   const { data, loading, error } = useSourcesAnalytics();
+  const [searchParams] = useSearchParams();
   const [expandedSources, setExpandedSources] = useState<ExpandedSources>({});
+  const sourceRefs = useRef<{ [key: number]: HTMLTableRowElement | null }>({});
+  const hasScrolledRef = useRef(false);
 
   const chartData = useMemo(() => {
     if (!data?.sourceTypes) return [];
@@ -40,6 +44,32 @@ export function Sources() {
       color: TYPE_COLORS[st.type] || TYPE_COLORS.other,
     }));
   }, [data]);
+
+  // Auto-expand and scroll to selected domain from query param
+  useEffect(() => {
+    const selectedDomain = searchParams.get('domain');
+    if (selectedDomain && data?.topSources && !hasScrolledRef.current) {
+      const source = data.topSources.find(
+        (s) => s.domain.toLowerCase() === selectedDomain.toLowerCase()
+      );
+      if (source) {
+        setExpandedSources({ [source.id]: true });
+        // Scroll to the row after a short delay to let the DOM update
+        setTimeout(() => {
+          const row = sourceRefs.current[source.id];
+          if (row) {
+            row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            // Add highlight animation
+            row.classList.add('ring-2', 'ring-[var(--accent-primary)]');
+            setTimeout(() => {
+              row.classList.remove('ring-2', 'ring-[var(--accent-primary)]');
+            }, 2000);
+          }
+        }, 100);
+        hasScrolledRef.current = true;
+      }
+    }
+  }, [searchParams, data]);
 
   const toggleSource = (id: number) => {
     setExpandedSources(prev => ({
@@ -258,7 +288,8 @@ export function Sources() {
                   <>
                     <tr
                       key={source.id}
-                      className="border-b border-[var(--border-subtle)] hover:bg-[var(--bg-tertiary)] transition-colors cursor-pointer"
+                      ref={(el) => { sourceRefs.current[source.id] = el; }}
+                      className="border-b border-[var(--border-subtle)] hover:bg-[var(--bg-tertiary)] transition-all cursor-pointer"
                       onClick={() => toggleSource(source.id)}
                     >
                       <td className="py-3">

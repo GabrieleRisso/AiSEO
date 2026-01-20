@@ -1,10 +1,11 @@
 import { NavLink } from 'react-router';
-import { LayoutDashboard, MessageSquareText, Globe, Lightbulb, Settings, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { LayoutDashboard, MessageSquareText, Globe, Tag, Lightbulb, Settings, X, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/prompts', icon: MessageSquareText, label: 'Prompts' },
   { to: '/sources', icon: Globe, label: 'Sources' },
+  { to: '/brands', icon: Tag, label: 'Brands' },
   { to: '/suggestions', icon: Lightbulb, label: 'Suggestions' },
 ];
 

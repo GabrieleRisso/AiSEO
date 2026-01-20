@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   fetchBrands,
   fetchPrompts,
@@ -8,6 +8,7 @@ import {
   fetchVisibilityData,
   fetchSourcesAnalytics,
   fetchSuggestions,
+  fetchBrandsDetails,
   type BrandResponse,
   type PromptResponse,
   type PromptDetailResponse,
@@ -16,6 +17,7 @@ import {
   type DailyVisibilityResponse,
   type SourcesAnalyticsResponse,
   type SuggestionsDataResponse,
+  type BrandsListResponse,
 } from '../api/client';
 
 interface UseApiState<T> {
@@ -156,4 +158,25 @@ export function useSuggestions() {
   }, []);
 
   return state;
+}
+
+export function useBrandsDetails() {
+  const [state, setState] = useState<UseApiState<BrandsListResponse>>({
+    data: null,
+    loading: true,
+    error: null,
+  });
+
+  const refetch = useCallback(() => {
+    setState(prev => ({ ...prev, loading: true }));
+    fetchBrandsDetails()
+      .then((data) => setState({ data, loading: false, error: null }))
+      .catch((error) => setState({ data: null, loading: false, error }));
+  }, []);
+
+  useEffect(() => {
+    refetch();
+  }, [refetch]);
+
+  return { ...state, refetch };
 }

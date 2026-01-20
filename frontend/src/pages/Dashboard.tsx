@@ -32,18 +32,21 @@ const brandColumns = [
     header: 'Brand',
     sortable: true,
     render: (brand: Brand) => (
-      <div className="flex items-center gap-3">
+      <Link
+        to={`/brands?selected=${brand.id}`}
+        className="flex items-center gap-3 hover:opacity-80 transition-opacity"
+      >
         <div
           className="w-3 h-3 rounded-full ring-2 ring-[var(--bg-primary)]"
           style={{ backgroundColor: brand.color, boxShadow: `0 0 8px ${brand.color}40` }}
         />
-        <span className="font-medium text-[var(--text-primary)]">{brand.name}</span>
+        <span className="font-medium text-[var(--text-primary)] hover:text-[var(--accent-primary)] transition-colors">{brand.name}</span>
         {brand.type === 'primary' && (
           <span className="badge-glow badge-primary text-[10px] px-2 py-0.5 rounded-md">
             You
           </span>
         )}
-      </div>
+      </Link>
     ),
   },
   {
@@ -82,10 +85,13 @@ const sourceColumns = [
     header: 'Source',
     sortable: true,
     render: (source: Source) => (
-      <div className="flex items-center gap-2">
+      <Link
+        to={`/sources?domain=${encodeURIComponent(source.domain)}`}
+        className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+      >
         <Globe className="w-4 h-4 text-[var(--accent-primary)]" />
-        <span className="font-medium text-[var(--text-primary)]">{source.domain}</span>
-      </div>
+        <span className="font-medium text-[var(--text-primary)] hover:text-[var(--accent-primary)] transition-colors">{source.domain}</span>
+      </Link>
     ),
   },
   {
