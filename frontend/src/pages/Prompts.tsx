@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router';
-import { Search, ChevronDown, ChevronRight, ChevronUp, ExternalLink, Loader2, Calendar, Plus } from 'lucide-react';
+import { Search, ChevronDown, ChevronRight, ChevronUp, ExternalLink, Loader2, Calendar, Plus, HelpCircle, X } from 'lucide-react';
 import { PromptsSkeleton } from '../components/ui/Skeleton';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Header } from '../components/layout/Header';
@@ -60,7 +60,7 @@ function PromptRow({
           </div>
         </td>
         <td className="px-5 py-4 whitespace-nowrap">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 justify-center">
             <div className="progress-bar w-20">
               <div
                 className="progress-bar-fill"
@@ -76,9 +76,6 @@ function PromptRow({
           <span className="text-sm font-mono text-[var(--text-secondary)]">
             {prompt.avgPosition > 0 ? `#${prompt.avgPosition}` : '-'}
           </span>
-        </td>
-        <td className="px-5 py-4 whitespace-nowrap text-center">
-          <span className="text-sm font-mono text-[var(--text-secondary)]">{prompt.totalMentions}</span>
         </td>
         <td className="px-5 py-4 whitespace-nowrap text-center">
           <span className="text-sm font-mono text-[var(--accent-primary)]">{prompt.totalRuns}</span>
@@ -149,7 +146,7 @@ function ExpandedPromptDetail({ queryId, brands }: { queryId: string; brands: Br
   if (loading) {
     return (
       <tr className="animate-fade-in">
-        <td colSpan={6} className="px-5 py-8 bg-[var(--bg-elevated)]/50">
+        <td colSpan={5} className="px-5 py-8 bg-[var(--bg-elevated)]/50">
           <div className="flex items-center justify-center gap-2 text-[var(--text-muted)]">
             <Loader2 className="w-4 h-4 animate-spin" />
             Loading details...
@@ -162,7 +159,7 @@ function ExpandedPromptDetail({ queryId, brands }: { queryId: string; brands: Br
   if (error || !detail) {
     return (
       <tr className="animate-fade-in">
-        <td colSpan={6} className="px-5 py-8 bg-[var(--bg-elevated)]/50">
+        <td colSpan={5} className="px-5 py-8 bg-[var(--bg-elevated)]/50">
           <div className="text-center text-red-400">Failed to load details</div>
         </td>
       </tr>
@@ -174,7 +171,7 @@ function ExpandedPromptDetail({ queryId, brands }: { queryId: string; brands: Br
 
   return (
     <tr className="animate-fade-in">
-      <td colSpan={6} className="px-5 py-4 bg-[var(--bg-elevated)]/50">
+      <td colSpan={5} className="px-5 py-4 bg-[var(--bg-elevated)]/50">
         <div className="pl-6 space-y-6">
           {/* Aggregated Stats */}
           <div className="flex items-center gap-6 text-sm">
@@ -352,7 +349,92 @@ function BrandMentionCard({ mention, brands }: { mention: PromptBrandMention; br
   );
 }
 
-type SortKey = 'query' | 'visibility' | 'avgPosition' | 'totalMentions' | 'totalRuns';
+function VisibilityHelpDialog({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center">
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={onClose}
+      />
+
+      {/* Dialog */}
+      <div className="relative bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-2xl shadow-2xl max-w-lg w-full mx-4 animate-fade-in">
+        {/* Header */}
+        <div className="flex items-center justify-between p-5 border-b border-[var(--border-subtle)]">
+          <h2 className="text-lg font-semibold text-[var(--text-primary)]">How Visibility Works</h2>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg hover:bg-[var(--bg-elevated)] transition-colors"
+          >
+            <X className="w-5 h-5 text-[var(--text-muted)]" />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="p-5 space-y-5">
+          <p className="text-sm text-[var(--text-secondary)]">
+            Visibility shows how prominently your brand appears in AI responses.
+            It's based on where your brand is mentioned compared to competitors.
+          </p>
+
+          {/* Formula */}
+          <div className="bg-[var(--bg-elevated)] rounded-xl p-4">
+            <h4 className="text-sm font-semibold text-[var(--text-primary)] mb-2">Formula</h4>
+            <code className="text-sm font-mono text-[var(--accent-primary)]">
+              visibility = max(0, 100 - (position - 1) × 20)
+            </code>
+          </div>
+
+          <div>
+            <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-3">Score by Position</h3>
+            <div className="space-y-2">
+              {[
+                { pos: '1st', score: '100%', label: 'Excellent', color: '#4ade80' },
+                { pos: '2nd', score: '80%', label: 'Very Good', color: '#a3e635' },
+                { pos: '3rd', score: '60%', label: 'Good', color: '#facc15' },
+                { pos: '4th', score: '40%', label: 'Fair', color: '#fb923c' },
+                { pos: '5th', score: '20%', label: 'Low', color: '#f87171' },
+                { pos: '6th+', score: '0%', label: 'Poorly Ranked', color: '#6b7280' },
+                { pos: 'Not mentioned', score: '0%', label: 'Poorly Ranked', color: '#6b7280' },
+              ].map((item) => (
+                <div key={item.pos} className="flex items-center gap-3 text-sm">
+                  <span className="w-24 text-[var(--text-muted)]">{item.pos}</span>
+                  <span className="w-12 font-mono font-semibold" style={{ color: item.color }}>{item.score}</span>
+                  <span className="text-[var(--text-secondary)]">{item.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="bg-[var(--bg-elevated)] rounded-xl p-4">
+            <h4 className="text-sm font-semibold text-[var(--text-primary)] mb-2">Why 0% for position 6+?</h4>
+            <p className="text-sm text-[var(--text-muted)]">
+              Users rarely scroll past the first few recommendations. If your brand appears 6th or later, it's effectively invisible.
+            </p>
+          </div>
+
+          <div>
+            <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-2">Average Visibility</h3>
+            <p className="text-sm text-[var(--text-secondary)] mb-3">
+              When we run the same query multiple times, we average the scores.
+            </p>
+            <div className="bg-[var(--bg-elevated)] rounded-xl p-4 text-sm font-mono text-[var(--text-muted)]">
+              <div className="mb-2">Example: A query run 10 times</div>
+              <div>• 7 times mentioned 2nd (80% each)</div>
+              <div>• 3 times not mentioned (0% each)</div>
+              <div className="mt-2 text-[var(--text-data)] font-semibold">Average: (7×80 + 3×0) / 10 = 56%</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+type SortKey = 'query' | 'visibility' | 'avgPosition' | 'totalRuns';
 type SortDirection = 'asc' | 'desc' | null;
 
 export function Prompts() {
@@ -362,6 +444,7 @@ export function Prompts() {
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>(null);
   const [selectedAISource, setSelectedAISource] = useState<AISource>('ai-overview');
+  const [showHelpDialog, setShowHelpDialog] = useState(false);
 
   const { data: prompts, loading: promptsLoading, error: promptsError } = usePrompts();
   const { data: brandsData, loading: brandsLoading } = useBrands();
@@ -392,7 +475,8 @@ export function Prompts() {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
     } else {
       setSortKey(key);
-      setSortDirection('asc');
+      // Start with desc for visibility (highest first), asc for others
+      setSortDirection(key === 'visibility' ? 'desc' : 'asc');
     }
   };
 
@@ -528,6 +612,16 @@ export function Prompts() {
                     >
                       <div className="flex items-center gap-1 justify-center">
                         <span>Visibility</span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowHelpDialog(true);
+                          }}
+                          className="p-0.5 rounded hover:bg-[var(--bg-elevated)] transition-colors"
+                          title="How is visibility calculated?"
+                        >
+                          <HelpCircle className="w-3.5 h-3.5 text-[var(--text-muted)] hover:text-[var(--accent-primary)]" />
+                        </button>
                         {sortKey === 'visibility' && sortDirection === 'asc' && <ChevronUp className="w-3 h-3 text-[var(--accent-primary)]" />}
                         {sortKey === 'visibility' && sortDirection === 'desc' && <ChevronDown className="w-3 h-3 text-[var(--accent-primary)]" />}
                         {sortKey !== 'visibility' && <ChevronUp className="w-3 h-3 opacity-30" />}
@@ -542,17 +636,6 @@ export function Prompts() {
                         {sortKey === 'avgPosition' && sortDirection === 'asc' && <ChevronUp className="w-3 h-3 text-[var(--accent-primary)]" />}
                         {sortKey === 'avgPosition' && sortDirection === 'desc' && <ChevronDown className="w-3 h-3 text-[var(--accent-primary)]" />}
                         {sortKey !== 'avgPosition' && <ChevronUp className="w-3 h-3 opacity-30" />}
-                      </div>
-                    </th>
-                    <th
-                      onClick={() => handleSort('totalMentions')}
-                      className="cursor-pointer select-none hover:text-[var(--text-primary)] transition-colors text-center"
-                    >
-                      <div className="flex items-center gap-1 justify-center">
-                        <span>Mentions</span>
-                        {sortKey === 'totalMentions' && sortDirection === 'asc' && <ChevronUp className="w-3 h-3 text-[var(--accent-primary)]" />}
-                        {sortKey === 'totalMentions' && sortDirection === 'desc' && <ChevronDown className="w-3 h-3 text-[var(--accent-primary)]" />}
-                        {sortKey !== 'totalMentions' && <ChevronUp className="w-3 h-3 opacity-30" />}
                       </div>
                     </th>
                     <th
@@ -605,6 +688,9 @@ export function Prompts() {
           </div>
         )}
       </div>
+
+      {/* Help Dialog */}
+      <VisibilityHelpDialog isOpen={showHelpDialog} onClose={() => setShowHelpDialog(false)} />
     </div>
   );
 }

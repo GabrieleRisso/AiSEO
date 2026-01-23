@@ -48,7 +48,7 @@ export function AISourceSelector({ selectedSource, onSourceChange }: AISourceSel
 
       {/* Dropdown Menu */}
       {isOpen && (
-        <div className="absolute top-full left-0 mt-2 w-full min-w-[220px] bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-xl shadow-2xl overflow-visible z-[9999] animate-fade-in">
+        <div className="absolute top-full left-0 mt-2 w-full min-w-[220px] bg-[#171719] border border-[var(--border-subtle)] rounded-xl shadow-2xl overflow-visible z-[9999] animate-fade-in">
           <div className="py-1">
             {AI_SOURCES.map((source) => {
               const isSelected = source.id === selectedSource;
