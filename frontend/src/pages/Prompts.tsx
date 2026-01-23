@@ -5,6 +5,8 @@ import { PromptsSkeleton } from '../components/ui/Skeleton';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Header } from '../components/layout/Header';
 import { SentimentBadge } from '../components/ui/Badge';
+import { AISourceSelector } from '../components/ui/AISourceSelector';
+import { type AISource } from '../components/ui/AISourceIcons';
 import { usePrompts, useBrands, usePromptDetail } from '../hooks/useApi';
 import { config } from '../config';
 import type { PromptResponse } from '../api/client';
@@ -359,6 +361,7 @@ export function Prompts() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>(null);
+  const [selectedAISource, setSelectedAISource] = useState<AISource>('ai-overview');
 
   const { data: prompts, loading: promptsLoading, error: promptsError } = usePrompts();
   const { data: brandsData, loading: brandsLoading } = useBrands();
@@ -398,8 +401,14 @@ export function Prompts() {
     return brandsData.map(b => ({ id: b.id, name: b.name, color: b.color }));
   }, [brandsData]);
 
+  // Check if selected AI source has data (only AI Overview has data currently)
+  const sourceHasData = selectedAISource === 'all' || selectedAISource === 'ai-overview';
+
   const filteredPrompts = useMemo(() => {
+    // If source has no data, return empty array
+    if (!sourceHasData) return [];
     if (!prompts) return [];
+
     let filtered = [...prompts];
 
     // Apply search filter
@@ -433,7 +442,7 @@ export function Prompts() {
       }
     }
     return filtered;
-  }, [prompts, searchQuery, expandedId, sortKey, sortDirection]);
+  }, [prompts, searchQuery, expandedId, sortKey, sortDirection, sourceHasData]);
 
   const toggleExpanded = (id: string) => {
     setExpandedId(expandedId === id ? null : id);
@@ -449,18 +458,27 @@ export function Prompts() {
       />
 
       <div className="p-8">
-        {/* Search and Add Button */}
-        <div className="flex items-center justify-between gap-4 mb-6 animate-fade-in-up delay-100">
-          <div className="relative max-w-md flex-1">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
-            <input
-              type="text"
-              placeholder="Search prompts..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="input-dark w-full pr-4 py-2.5 text-sm"
-              style={{ paddingLeft: '2.5rem' }}
+        {/* AI Source Selector, Search and Add Button */}
+        <div className="flex items-center justify-between gap-4 mb-6 animate-fade-in-up delay-100 relative z-[100]">
+          <div className="flex items-center gap-4 flex-1">
+            {/* AI Source Selector */}
+            <AISourceSelector
+              selectedSource={selectedAISource}
+              onSourceChange={setSelectedAISource}
             />
+
+            {/* Search Input */}
+            <div className="relative max-w-md flex-1">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
+              <input
+                type="text"
+                placeholder="Search prompts..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="input-dark w-full pr-4 py-2.5 text-sm"
+                style={{ paddingLeft: '2.5rem' }}
+              />
+            </div>
           </div>
           <div className="relative group/addprompt">
             <button
@@ -488,7 +506,7 @@ export function Prompts() {
 
         {/* Table */}
         {!isLoading && !promptsError && (
-          <div className="glass-card overflow-hidden animate-fade-in-up delay-150">
+          <div className="glass-card overflow-hidden animate-fade-in-up delay-150 relative z-[10]">
             <div className="overflow-x-auto">
               <table className="table-dark">
                 <thead>
@@ -567,8 +585,20 @@ export function Prompts() {
 
               {filteredPrompts.length === 0 && (
                 <EmptyState
-                  title={searchQuery ? "No prompts found" : "No prompts yet"}
-                  description={searchQuery ? `No prompts matching "${searchQuery}"` : "Run your first AI search analysis to see prompts here."}
+                  title={
+                    !sourceHasData
+                      ? `No data for ${selectedAISource === 'chatgpt' ? 'ChatGPT' : selectedAISource === 'claude' ? 'Claude' : selectedAISource === 'gemini' ? 'Gemini' : selectedAISource === 'perplexity' ? 'Perplexity' : selectedAISource}`
+                      : searchQuery
+                      ? "No prompts found"
+                      : "No prompts yet"
+                  }
+                  description={
+                    !sourceHasData
+                      ? `Tracking for this AI source is coming soon. Currently only Google AI Overview data is available.`
+                      : searchQuery
+                      ? `No prompts matching "${searchQuery}"`
+                      : "Run your first AI search analysis to see prompts here."
+                  }
                 />
               )}
             </div>

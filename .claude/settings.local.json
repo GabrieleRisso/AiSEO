@@ -43,7 +43,14 @@
       "Bash(pkill:*)",
       "Bash(git commit:*)",
       "Bash(find:*)",
-      "WebFetch(domain:render.com)"
+      "WebFetch(domain:render.com)",
+      "mcp__exa__web_search_exa",
+      "WebFetch(domain:lobehub.com)",
+      "WebFetch(domain:uxwing.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:simpleicons.org)",
+      "WebFetch(domain:cdn.jsdelivr.net)",
+      "mcp__playwright__browser_network_requests"
     ]
   }
 }
