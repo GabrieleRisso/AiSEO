@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Tester - AiSEO</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #1e1e1e;
+            color: #e0e0e0;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 280px;
+            background: #252526;
+            border-right: 1px solid #3e3e42;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+
+        .sidebar-header {
+            padding: 16px;
+            border-bottom: 1px solid #3e3e42;
+            background: #2d2d30;
+        }
+
+        .sidebar-header h1 {
+            font-size: 18px;
+            font-weight: 600;
+            color: #ffffff;
+        }
+
+        .endpoint-group {
+            margin: 8px 0;
+        }
+
+        .group-title {
+            padding: 8px 16px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #858585;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .endpoint-item {
+            padding: 8px 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: background 0.2s;
+        }
+
+        .endpoint-item:hover {
+            background: #2a2d2e;
+        }
+
+        .endpoint-item.active {
+            background: #094771;
+        }
+
+        .method-badge {
+            font-size: 10px;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 3px;
+            min-width: 50px;
+            text-align: center;
+        }
+
+        .method-get { background: #61affe; color: #fff; }
+        .method-post { background: #49cc90; color: #fff; }
+        .method-put { background: #fca130; color: #fff; }
+        .method-delete { background: #f93e3e; color: #fff; }
+        .method-patch { background: #50e3c2; color: #fff; }
+
+        .endpoint-path {
+            font-size: 13px;
+            color: #cccccc;
+            flex: 1;
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .tabs {
+            display: flex;
+            background: #2d2d30;
+            border-bottom: 1px solid #3e3e42;
+        }
+
+        .tab {
+            padding: 12px 24px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+            color: #858585;
+        }
+
+        .tab.active {
+            color: #ffffff;
+            border-bottom-color: #007acc;
+        }
+
+        .tab-content {
+            flex: 1;
+            display: none;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .tab-content.active {
+            display: flex;
+        }
+
+        /* Request Panel */
+        .request-panel {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .request-header {
+            padding: 16px;
+            background: #252526;
+            border-bottom: 1px solid #3e3e42;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .method-select {
+            padding: 8px 12px;
+            background: #3c3c3c;
+            border: 1px solid #3e3e42;
+            border-radius: 4px;
+            color: #e0e0e0;
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        .url-input {
+            flex: 1;
+            padding: 8px 12px;
+            background: #1e1e1e;
+            border: 1px solid #3e3e42;
+            border-radius: 4px;
+            color: #e0e0e0;
+            font-size: 13px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .send-btn {
+            padding: 8px 24px;
+            background: #007acc;
+            border: none;
+            border-radius: 4px;
+            color: #ffffff;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .send-btn:hover {
+            background: #005a9e;
+        }
+
+        .send-btn:disabled {
+            background: #3c3c3c;
+            cursor: not-allowed;
+        }
+
+        .request-body {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 16px;
+            overflow-y: auto;
+        }
+
+        .section {
+            margin-bottom: 24px;
+        }
+
+        .section-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: #858585;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+
+        .json-editor {
+            width: 100%;
+            min-height: 200px;
+            padding: 12px;
+            background: #1e1e1e;
+            border: 1px solid #3e3e42;
+            border-radius: 4px;
+            color: #e0e0e0;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            resize: vertical;
+        }
+
+        .param-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 8px;
+            align-items: center;
+        }
+
+        .param-key {
+            flex: 1;
+            padding: 6px 8px;
+            background: #1e1e1e;
+            border: 1px solid #3e3e42;
+            border-radius: 4px;
+            color: #e0e0e0;
+            font-size: 13px;
+        }
+
+        .param-value {
+            flex: 2;
+            padding: 6px 8px;
+            background: #1e1e1e;
+            border: 1px solid #3e3e42;
+            border-radius: 4px;
+            color: #e0e0e0;
+            font-size: 13px;
+        }
+
+        .remove-param {
+            padding: 6px 12px;
+            background: #f93e3e;
+            border: none;
+            border-radius: 4px;
+            color: #fff;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .add-param {
+            padding: 6px 12px;
+            background: #49cc90;
+            border: none;
+            border-radius: 4px;
+            color: #fff;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        /* Response Panel */
+        .response-panel {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .response-header {
+            padding: 16px;
+            background: #252526;
+            border-bottom: 1px solid #3e3e42;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .status-200 { background: #49cc90; color: #fff; }
+        .status-400 { background: #fca130; color: #fff; }
+        .status-500 { background: #f93e3e; color: #fff; }
+
+        .response-body {
+            flex: 1;
+            padding: 16px;
+            overflow-y: auto;
+        }
+
+        .response-json {
+            background: #1e1e1e;
+            border: 1px solid #3e3e42;
+            border-radius: 4px;
+            padding: 16px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            color: #e0e0e0;
+        }
+
+        /* Logs Panel */
+        .logs-panel {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .logs-header {
+            padding: 16px;
+            background: #252526;
+            border-bottom: 1px solid #3e3e42;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .container-select {
+            padding: 8px 12px;
+            background: #3c3c3c;
+            border: 1px solid #3e3e42;
+            border-radius: 4px;
+            color: #e0e0e0;
+            font-size: 13px;
+            cursor: pointer;
+            flex: 1;
+        }
+
+        .refresh-logs {
+            padding: 8px 16px;
+            background: #007acc;
+            border: none;
+            border-radius: 4px;
+            color: #ffffff;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .logs-body {
+            flex: 1;
+            padding: 16px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            background: #1e1e1e;
+        }
+
+        .log-line {
+            margin-bottom: 4px;
+            padding: 4px 0;
+            border-bottom: 1px solid #2a2d2e;
+        }
+
+        .log-error { color: #f48771; }
+        .log-warn { color: #dcdcaa; }
+        .log-info { color: #4ec9b0; }
+        .log-debug { color: #858585; }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #858585;
+        }
+
+        .error-message {
+            background: #3c1e1e;
+            border: 1px solid #f93e3e;
+            border-radius: 4px;
+            padding: 12px;
+            color: #f48771;
+            margin: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <h1>API Tester</h1>
+            </div>
+            
+            <div class="endpoint-group">
+                <div class="group-title">Scraper API (Port 5000)</div>
+                <div class="endpoint-item" data-endpoint='{"method":"GET","url":"http://localhost:5000/health"}'>
+                    <span class="method-badge method-get">GET</span>
+                    <span class="endpoint-path">/health</span>
+                </div>
+                <div class="endpoint-item" data-endpoint='{"method":"GET","url":"http://localhost:5000/config"}'>
+                    <span class="method-badge method-get">GET</span>
+                    <span class="endpoint-path">/config</span>
+                </div>
+                <div class="endpoint-item" data-endpoint='{"method":"POST","url":"http://localhost:5000/scrape","body":{"query":"best seo tools","country":"us","num_results":10,"scraper_type":"google_ai","take_screenshot":false,"headless":true,"use_residential_proxy":false}}'>
+                    <span class="method-badge method-post">POST</span>
+                    <span class="endpoint-path">/scrape</span>
+                </div>
+            </div>
+
+            <div class="endpoint-group">
+                <div class="group-title">Backend API (Port 8000)</div>
+                <div class="endpoint-item" data-endpoint='{"method":"GET","url":"http://localhost:8000/api/health"}'>
+                    <span class="method-badge method-get">GET</span>
+                    <span class="endpoint-path">/api/health</span>
+                </div>
+                <div class="endpoint-item" data-endpoint='{"method":"GET","url":"http://localhost:8000/api/config"}'>
+                    <span class="method-badge method-get">GET</span>
+                    <span class="endpoint-path">/api/config</span>
+                </div>
+                <div class="endpoint-item" data-endpoint='{"method":"GET","url":"http://localhost:8000/api/vpn/servers"}'>
+                    <span class="method-badge method-get">GET</span>
+                    <span class="endpoint-path">/api/vpn/servers</span>
+                </div>
+                <div class="endpoint-item" data-endpoint='{"method":"GET","url":"http://localhost:8000/api/brands"}'>
+                    <span class="method-badge method-get">GET</span>
+                    <span class="endpoint-path">/api/brands</span>
+                </div>
+                <div class="endpoint-item" data-endpoint='{"method":"GET","url":"http://localhost:8000/api/brands/details"}'>
+                    <span class="method-badge method-get">GET</span>
+                    <span class="endpoint-path">/api/brands/details</span>
+                </div>
+                <div class="endpoint-item" data-endpoint='{"method":"POST","url":"http://localhost:8000/api/brands","body":{"id":"test-brand","name":"Test Brand","type":"competitor","color":"#ff0000","variations":["Test","Test Brand"]}}'>
+                    <span class="method-badge method-post">POST</span>
+                    <span class="endpoint-path">/api/brands</span>
+                </div>
+                <div class="endpoint-item" data-endpoint='{"method":"GET","url":"http://localhost:8000/api/prompts"}'>
+                    <span class="method-badge method-get">GET</span>
+                    <span class="endpoint-path">/api/prompts</span>
+                </div>
+                <div class="endpoint-item" data-endpoint='{"method":"GET","url":"http://localhost:8000/api/sources"}'>
+                    <span class="method-badge method-get">GET</span>
+                    <span class="endpoint-path">/api/sources</span>
+                </div>
+                <div class="endpoint-item" data-endpoint='{"method":"GET","url":"http://localhost:8000/api/metrics"}'>
+                    <span class="method-badge method-get">GET</span>
+                    <span class="endpoint-path">/api/metrics</span>
+                </div>
+                <div class="endpoint-item" data-endpoint='{"method":"GET","url":"http://localhost:8000/api/visibility"}'>
+                    <span class="method-badge method-get">GET</span>
+                    <span class="endpoint-path">/api/visibility</span>
+                </div>
+                <div class="endpoint-item" data-endpoint='{"method":"GET","url":"http://localhost:8000/api/sources/analytics"}'>
+                    <span class="method-badge method-get">GET</span>
+                    <span class="endpoint-path">/api/sources/analytics</span>
+                </div>
+                <div class="endpoint-item" data-endpoint='{"method":"GET","url":"http://localhost:8000/api/suggestions"}'>
+                    <span class="method-badge method-get">GET</span>
+                    <span class="endpoint-path">/api/suggestions</span>
+                </div>
+                <div class="endpoint-item" data-endpoint='{"method":"GET","url":"http://localhost:8000/api/jobs"}'>
+                    <span class="method-badge method-get">GET</span>
+                    <span class="endpoint-path">/api/jobs</span>
+                </div>
+                <div class="endpoint-item" data-endpoint='{"method":"POST","url":"http://localhost:8000/api/jobs/scrape","body":{"query":"best seo tools","country":"us","num_results":10,"scraper_type":"google_ai","device_type":"desktop","os_type":"windows","browser_type":"chrome","human_behavior":true,"take_screenshot":false,"run_in_background":true,"use_residential_proxy":false,"antidetect_enabled":true}}'>
+                    <span class="method-badge method-post">POST</span>
+                    <span class="endpoint-path">/api/jobs/scrape</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <div class="tabs">
+                <div class="tab active" data-tab="request">Request</div>
+                <div class="tab" data-tab="response">Response</div>
+                <div class="tab" data-tab="logs">Logs</div>
+            </div>
+
+            <!-- Request Tab -->
+            <div class="tab-content active" id="request-tab">
+                <div class="request-panel">
+                    <div class="request-header">
+                        <select class="method-select" id="method-select">
+                            <option value="GET">GET</option>
+                            <option value="POST">POST</option>
+                            <option value="PUT">PUT</option>
+                            <option value="DELETE">DELETE</option>
+                            <option value="PATCH">PATCH</option>
+                        </select>
+                        <input type="text" class="url-input" id="url-input" placeholder="Enter URL or select endpoint from sidebar">
+                        <button class="send-btn" id="send-btn">Send</button>
+                    </div>
+                    <div class="request-body">
+                        <div class="section">
+                            <div class="section-title">Query Parameters</div>
+                            <div id="query-params"></div>
+                            <button class="add-param" onclick="addQueryParam()">+ Add Parameter</button>
+                        </div>
+                        <div class="section">
+                            <div class="section-title">Request Body (JSON)</div>
+                            <textarea class="json-editor" id="request-body" placeholder='{"key": "value"}'></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Response Tab -->
+            <div class="tab-content" id="response-tab">
+                <div class="response-panel">
+                    <div class="response-header">
+                        <div>
+                            <span class="section-title">Status:</span>
+                            <span class="status-badge" id="status-badge">-</span>
+                        </div>
+                        <div>
+                            <span class="section-title">Time:</span>
+                            <span id="response-time">-</span>
+                        </div>
+                    </div>
+                    <div class="response-body">
+                        <div class="response-json" id="response-json">No response yet. Send a request to see the response.</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Logs Tab -->
+            <div class="tab-content" id="logs-tab">
+                <div class="logs-panel">
+                    <div class="logs-header">
+                        <select class="container-select" id="container-select">
+                            <option value="aiseo-scraper">aiseo-scraper</option>
+                            <option value="aiseo-api">aiseo-api</option>
+                            <option value="vpn-fr">vpn-fr</option>
+                            <option value="vpn-de">vpn-de</option>
+                            <option value="vpn-nl">vpn-nl</option>
+                            <option value="vpn-it">vpn-it</option>
+                            <option value="vpn-es">vpn-es</option>
+                            <option value="vpn-uk">vpn-uk</option>
+                            <option value="vpn-ch">vpn-ch</option>
+                            <option value="vpn-se">vpn-se</option>
+                            <option value="vpn-manager">vpn-manager</option>
+                        </select>
+                        <button class="refresh-logs" onclick="loadLogs()">Refresh</button>
+                    </div>
+                    <div class="logs-body" id="logs-body">
+                        <div class="loading">Select a container and click Refresh to load logs</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Tab switching
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                document.getElementById(tab.dataset.tab + '-tab').classList.add('active');
+            });
+        });
+
+        // Endpoint selection
+        document.querySelectorAll('.endpoint-item').forEach(item => {
+            item.addEventListener('click', () => {
+                document.querySelectorAll('.endpoint-item').forEach(i => i.classList.remove('active'));
+                item.classList.add('active');
+                
+                const endpoint = JSON.parse(item.dataset.endpoint);
+                document.getElementById('method-select').value = endpoint.method;
+                document.getElementById('url-input').value = endpoint.url;
+                
+                if (endpoint.body) {
+                    document.getElementById('request-body').value = JSON.stringify(endpoint.body, null, 2);
+                } else {
+                    document.getElementById('request-body').value = '';
+                }
+                
+                // Clear query params
+                document.getElementById('query-params').innerHTML = '';
+            });
+        });
+
+        // Add query parameter
+        function addQueryParam() {
+            const container = document.getElementById('query-params');
+            const row = document.createElement('div');
+            row.className = 'param-row';
+            row.innerHTML = `
+                <input type="text" class="param-key" placeholder="Key">
+                <input type="text" class="param-value" placeholder="Value">
+                <button class="remove-param" onclick="this.parentElement.remove()">Remove</button>
+            `;
+            container.appendChild(row);
+        }
+
+        // Send request
+        document.getElementById('send-btn').addEventListener('click', async () => {
+            const method = document.getElementById('method-select').value;
+            const urlInput = document.getElementById('url-input').value;
+            const requestBody = document.getElementById('request-body').value;
+            
+            if (!urlInput) {
+                alert('Please enter a URL');
+                return;
+            }
+
+            // Build URL with query parameters
+            let url = urlInput;
+            const queryParams = [];
+            document.querySelectorAll('.param-row').forEach(row => {
+                const key = row.querySelector('.param-key').value;
+                const value = row.querySelector('.param-value').value;
+                if (key && value) {
+                    queryParams.push(`${encodeURIComponent(key)}=${encodeURIComponent(value)}`);
+                }
+            });
+            if (queryParams.length > 0) {
+                url += (url.includes('?') ? '&' : '?') + queryParams.join('&');
+            }
+
+            // Prepare request
+            const options = {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            };
+
+            if (['POST', 'PUT', 'PATCH'].includes(method) && requestBody.trim()) {
+                try {
+                    options.body = JSON.stringify(JSON.parse(requestBody));
+                } catch (e) {
+                    alert('Invalid JSON in request body');
+                    return;
+                }
+            }
+
+            // Disable button
+            const sendBtn = document.getElementById('send-btn');
+            sendBtn.disabled = true;
+            sendBtn.textContent = 'Sending...';
+
+            // Switch to response tab
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.querySelector('[data-tab="response"]').classList.add('active');
+            document.getElementById('response-tab').classList.add('active');
+
+            const startTime = Date.now();
+
+            try {
+                const response = await fetch(url, options);
+                const endTime = Date.now();
+                const duration = endTime - startTime;
+
+                let responseData;
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    responseData = await response.json();
+                } else {
+                    responseData = await response.text();
+                }
+
+                // Update response UI
+                const statusBadge = document.getElementById('status-badge');
+                statusBadge.textContent = response.status;
+                statusBadge.className = 'status-badge';
+                if (response.status >= 200 && response.status < 300) {
+                    statusBadge.classList.add('status-200');
+                } else if (response.status >= 400 && response.status < 500) {
+                    statusBadge.classList.add('status-400');
+                } else {
+                    statusBadge.classList.add('status-500');
+                }
+
+                document.getElementById('response-time').textContent = `${duration}ms`;
+                
+                const responseJson = document.getElementById('response-json');
+                if (typeof responseData === 'string') {
+                    responseJson.textContent = responseData;
+                } else {
+                    responseJson.textContent = JSON.stringify(responseData, null, 2);
+                }
+            } catch (error) {
+                document.getElementById('status-badge').textContent = 'Error';
+                document.getElementById('status-badge').className = 'status-badge status-500';
+                document.getElementById('response-time').textContent = '-';
+                document.getElementById('response-json').textContent = `Error: ${error.message}`;
+            } finally {
+                sendBtn.disabled = false;
+                sendBtn.textContent = 'Send';
+            }
+        });
+
+        // Load logs
+        async function loadLogs() {
+            const container = document.getElementById('container-select').value;
+            const logsBody = document.getElementById('logs-body');
+            logsBody.innerHTML = '<div class="loading">Loading logs...</div>';
+
+            try {
+                const response = await fetch(`/api/logs/${container}?lines=100`);
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch logs: ${response.statusText}`);
+                }
+                const data = await response.json();
+                
+                if (data.error) {
+                    logsBody.innerHTML = `<div class="error-message">${data.error}</div>`;
+                    return;
+                }
+
+                const logs = data.logs || [];
+                if (logs.length === 0) {
+                    logsBody.innerHTML = '<div class="loading">No logs available</div>';
+                    return;
+                }
+
+                logsBody.innerHTML = logs.map(log => {
+                    const logClass = log.includes('ERROR') || log.includes('error') ? 'log-error' :
+                                    log.includes('WARN') || log.includes('warn') ? 'log-warn' :
+                                    log.includes('INFO') || log.includes('info') ? 'log-info' : 'log-debug';
+                    return `<div class="log-line ${logClass}">${escapeHtml(log)}</div>`;
+                }).join('');
+            } catch (error) {
+                logsBody.innerHTML = `<div class="error-message">Error loading logs: ${error.message}</div>`;
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Auto-refresh logs every 5 seconds when on logs tab
+        let logsInterval = null;
+        document.querySelector('[data-tab="logs"]').addEventListener('click', () => {
+            if (!logsInterval) {
+                loadLogs();
+                logsInterval = setInterval(() => {
+                    if (document.getElementById('logs-tab').classList.contains('active')) {
+                        loadLogs();
+                    }
+                }, 5000);
+            }
+        });
+    </script>
+</body>
+</html>

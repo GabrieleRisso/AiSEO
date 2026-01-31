@@ -12,12 +12,17 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import quote_plus
 from dataclasses import dataclass, asdict
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 import undetected_chromedriver as uc
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+
+from ..utils.logger import Log, C, ChainConnectivityChecker
+
+if TYPE_CHECKING:
+    from src.lib.antidetect import AntiDetectLayer
 
 
 @dataclass
@@ -39,7 +44,9 @@ class ScrapeResult:
     sources: list[dict]
     source_count: int
     success: bool
+    html_content: Optional[str] = None
     error: Optional[str] = None
+    connectivity_info: Optional[dict] = None
 
 
 class GoogleAIScraper:
@@ -47,9 +54,12 @@ class GoogleAIScraper:
 
     BASE_URL = "https://www.google.com/search"
 
-    def __init__(self, headless: bool = False):
+    def __init__(self, headless: bool = False, proxy: Optional[str] = None, antidetect: Optional['AntiDetectLayer'] = None):
         self.headless = headless
+        self.proxy = proxy
+        self.antidetect = antidetect
         self._driver = None
+        self.chain = ChainConnectivityChecker()
 
     def __enter__(self):
         self._start_browser()
@@ -60,29 +70,68 @@ class GoogleAIScraper:
 
     def _start_browser(self):
         """Start undetected Chrome browser."""
+        Log.step("Browser start", "browser")
+        
         options = uc.ChromeOptions()
-        options.add_argument("--window-size=1280,800")
         options.add_argument("--disable-blink-features=AutomationControlled")
         options.add_argument("--no-first-run")
         options.add_argument("--no-default-browser-check")
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
+        options.add_argument("--ignore-certificate-errors")
+        options.add_argument("--ignore-ssl-errors")
+
+        if self.antidetect and self.antidetect.is_enabled:
+            if self.antidetect.activate() and self.antidetect.profile:
+                profile = self.antidetect.profile
+                options.add_argument(f"--user-agent={profile.user_agent}")
+                options.add_argument(f"--window-size={profile.screen_width},{profile.screen_height}")
+                options.add_argument(f"--lang={profile.language}")
+                Log.data("Profile", f"{profile.language}, {profile.screen_width}x{profile.screen_height}")
+        else:
+            options.add_argument("--window-size=1280,800")
+
+        if self.proxy:
+            options.add_argument(f"--proxy-server={self.proxy}")
+            Log.data("Proxy", self.proxy[:50] + "..." if len(self.proxy) > 50 else self.proxy)
 
         if self.headless:
             options.add_argument("--headless=new")
 
-        # Use version_main to avoid version mismatch
-        self._driver = uc.Chrome(options=options, use_subprocess=True)
-        print("Browser started!")
-        time.sleep(2)  # Give browser time to stabilize
+        self._driver = uc.Chrome(options=options, use_subprocess=True, version_main=144)
+        
+        if self.antidetect and self.antidetect.is_enabled:
+            for script in self.antidetect.get_stealth_scripts():
+                try:
+                    self._driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": script})
+                except:
+                    pass
+                    
+        Log.ok("Browser ready", "browser")
+        time.sleep(2)
 
     def _close_browser(self):
         """Close the browser."""
         if self._driver:
+            Log.step("Closing browser", "browser")
             self._driver.quit()
+            Log.ok("Closed", "browser")
+
+    def _screenshot(self, name: str = "debug"):
+        """Take a screenshot."""
+        try:
+            d = Path(__file__).parent.parent.parent / "data" / "screenshots"
+            d.mkdir(parents=True, exist_ok=True)
+            p = d / f"{name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+            self._driver.save_screenshot(str(p))
+            Log.info(f"Screenshot: {p.name}")
+            return str(p)
+        except:
+            return None
 
     def _handle_cookie_consent(self):
         """Accept cookie consent if shown."""
         try:
-            # Try multiple selectors for the Accept button
             selectors = [
                 "//button[contains(text(), 'Accept all')]",
                 "//button[contains(text(), 'Accetta tutto')]",
@@ -96,32 +145,33 @@ class GoogleAIScraper:
                         EC.element_to_be_clickable((By.XPATH, selector))
                     )
                     accept_btn.click()
-                    print("Cookie consent accepted!")
+                    Log.ok("Cookies accepted")
                     time.sleep(2)
                     return
-                except Exception:
+                except:
                     continue
 
-            # If no button found by text, try by position (the blue button on the right)
-            try:
-                buttons = self._driver.find_elements(By.TAG_NAME, "button")
-                for btn in buttons:
-                    if "Accept" in btn.text or "accept" in btn.text.lower():
-                        btn.click()
-                        print("Cookie consent accepted (fallback)!")
-                        time.sleep(2)
-                        return
-            except Exception:
-                pass
-
-        except Exception as e:
-            print(f"Cookie consent handling: {e}")
+            # Fallback: JS click
+            clicked = self._driver.execute_script("""
+                var btns = document.querySelectorAll('button');
+                for (var b of btns) {
+                    var t = (b.textContent || '').toLowerCase();
+                    if (t.includes('accept') || t.includes('accetta')) {
+                        b.click(); return true;
+                    }
+                }
+                return false;
+            """)
+            if clicked:
+                Log.ok("Cookies accepted (JS)")
+                time.sleep(1)
+        except:
+            pass
 
     def _wait_for_response(self, timeout: int = 60):
         """Wait for AI response to be ready."""
-        print("Waiting for AI response to generate...")
+        Log.step("Waiting for AI response", "wait")
 
-        # Wait for "Thinking" to appear and then disappear
         start_time = time.time()
         while time.time() - start_time < timeout:
             try:
@@ -129,45 +179,40 @@ class GoogleAIScraper:
 
                 # Check for CAPTCHA
                 if "I'm not a robot" in page_text or "unusual traffic" in page_text.lower():
-                    print("\n*** CAPTCHA DETECTED - Please solve it manually ***")
-                    # Wait for user to solve
+                    Log.warn("CAPTCHA detected!")
                     while "I'm not a robot" in self._driver.page_source:
                         time.sleep(1)
-                    print("CAPTCHA solved! Continuing...")
+                    Log.ok("CAPTCHA resolved")
                     time.sleep(2)
 
-                # Check if response is ready (no more "Thinking")
+                # Check if response is ready
                 if "Thinking" not in page_text:
-                    # Give extra time for content to render
                     time.sleep(3)
+                    Log.ok("Response ready", "wait")
                     return
-
-            except Exception:
+            except:
                 pass
-
             time.sleep(1)
+        
+        Log.warn("Timeout waiting for response")
 
     def _extract_response_text(self) -> str:
         """Extract the main AI response text."""
         try:
-            # Get all text content from the page
             response_parts = []
 
-            # Get headings
             for h in self._driver.find_elements(By.CSS_SELECTOR, "h2, h3"):
                 text = h.text.strip()
-                if text and len(text) > 3 and len(text) < 200:
+                if text and 3 < len(text) < 200:
                     if not any(skip in text.lower() for skip in ['sign in', 'accessibility', 'filters']):
                         response_parts.append(f"## {text}")
 
-            # Get list items (recommendations)
             for li in self._driver.find_elements(By.TAG_NAME, "li"):
                 text = li.text.strip()
                 if text and len(text) > 30:
                     if not any(skip in text.lower() for skip in ['sign in', 'accessibility']):
                         response_parts.append(f"- {text}")
 
-            # Get table content
             for table in self._driver.find_elements(By.TAG_NAME, "table"):
                 rows = []
                 for tr in table.find_elements(By.TAG_NAME, "tr"):
@@ -179,139 +224,95 @@ class GoogleAIScraper:
 
             return "\n\n".join(response_parts)
         except Exception as e:
-            print(f"Error extracting response: {e}")
+            Log.warn(f"Response extraction: {e}")
             return ""
 
     def _expand_sources(self):
         """Click button to expand all sources."""
         try:
-            # Look for the sources count button (e.g., "22 sites" or "16 sites")
-            # This is typically a button with number + "sites" text
             buttons = self._driver.find_elements(By.TAG_NAME, "button")
             for btn in buttons:
                 try:
                     text = btn.text.strip()
-                    # Match patterns like "22 sites", "16 sites", etc.
                     if text and ('sites' in text.lower() or re.match(r'^\d+\s*$', text)):
                         if btn.is_displayed():
                             btn.click()
-                            print(f"Clicked sources button: '{text}'")
+                            Log.info(f"Expanded sources: {text}")
                             time.sleep(3)
                             return True
                 except:
                     continue
 
-            # Try clicking elements that contain "sites" text
             sites_elements = self._driver.find_elements(By.XPATH, "//*[contains(text(), 'sites')]")
             for elem in sites_elements:
                 try:
                     if elem.is_displayed() and elem.is_enabled():
                         elem.click()
-                        print(f"Clicked sites element: '{elem.text[:30]}'")
                         time.sleep(3)
                         return True
                 except:
                     continue
-
-            # Try "Show all" button
-            for selector in [
-                "//button[contains(text(), 'Show all')]",
-                "//*[contains(text(), 'Show all')]",
-            ]:
-                try:
-                    show_all = self._driver.find_element(By.XPATH, selector)
-                    if show_all.is_displayed():
-                        show_all.click()
-                        print("Clicked 'Show all' button")
-                        time.sleep(3)
-                        return True
-                except:
-                    continue
-
-            print("No sources expansion button found")
             return False
-        except Exception as e:
-            print(f"Could not expand sources: {e}")
+        except:
             return False
 
     def _extract_sources(self) -> list[Source]:
-        """Extract source citations from the expanded panel."""
+        """Extract source citations."""
         sources = []
         seen_urls = set()
 
         try:
-            # First try to expand sources panel
-            expanded = self._expand_sources()
+            self._expand_sources()
             time.sleep(1)
 
-            # If a dialog/panel opened, look for links inside it
+            # Get links from dialog or page
             dialog_links = []
             try:
-                # Check for dialog element
                 dialogs = self._driver.find_elements(By.CSS_SELECTOR, "dialog, [role='dialog'], [aria-modal='true']")
                 for dialog in dialogs:
                     if dialog.is_displayed():
-                        # Scroll within the dialog to load all sources
                         for _ in range(5):
                             try:
                                 self._driver.execute_script("arguments[0].scrollTop = arguments[0].scrollHeight", dialog)
                                 time.sleep(0.5)
                             except:
                                 break
-
                         dialog_links = dialog.find_elements(By.CSS_SELECTOR, "a[href^='http']")
-                        print(f"Found {len(dialog_links)} links in dialog")
                         break
             except:
                 pass
 
-            # If no dialog, look for the sources panel/list
             if not dialog_links:
-                try:
-                    # Look for list items that contain source links
-                    list_items = self._driver.find_elements(By.CSS_SELECTOR, "li a[href^='http']")
-                    dialog_links = list_items
-                    print(f"Found {len(dialog_links)} links in lists")
-                except:
-                    pass
+                dialog_links = self._driver.find_elements(By.CSS_SELECTOR, "li a[href^='http']")
 
-            # If still nothing or found few, also get all page links
             if len(dialog_links) < 20:
                 all_links = self._driver.find_elements(By.CSS_SELECTOR, "a[href^='http']")
-                # Combine dialog links with page links (dialog first as they're more relevant)
                 existing_hrefs = {l.get_attribute("href") for l in dialog_links}
                 for link in all_links:
                     href = link.get_attribute("href")
                     if href and href not in existing_hrefs:
                         dialog_links.append(link)
                         existing_hrefs.add(href)
-                print(f"Total links after combining: {len(dialog_links)}")
 
             for link in dialog_links:
                 try:
                     url = link.get_attribute("href")
-
-                    # Get title - try multiple ways
                     title = link.text.strip()
+                    
                     if not title:
-                        # Try getting text from child elements
                         try:
                             title = link.find_element(By.XPATH, ".//div | .//span").text.strip()
                         except:
                             pass
                     if not title:
-                        # Try aria-label
                         title = link.get_attribute("aria-label") or ""
 
-                    # Skip Google internal links
                     if not url or url in seen_urls:
                         continue
                     if any(skip in url for skip in ['google.com', 'accounts.google', 'support.google', 'policies.google', 'g.co/', 'gstatic.com']):
                         continue
 
-                    # Be more lenient with title
                     if not title:
-                        # Extract title from URL as fallback
                         try:
                             from urllib.parse import urlparse
                             path = urlparse(url).path
@@ -319,17 +320,16 @@ class GoogleAIScraper:
                         except:
                             title = url
 
-                    if len(title) < 10:  # Skip very short titles (just company names)
+                    if len(title) < 10:
                         continue
                     if any(skip in title.lower() for skip in ['sign in', 'accessibility', 'privacy', 'terms', 'google apps']):
                         continue
 
                     seen_urls.add(url)
 
-                    # Get metadata from parent
+                    # Get metadata
                     date = None
                     description = None
-
                     try:
                         parent = link
                         for _ in range(4):
@@ -356,7 +356,6 @@ class GoogleAIScraper:
                     except:
                         pass
 
-                    # Publisher from domain
                     publisher = None
                     try:
                         from urllib.parse import urlparse
@@ -379,59 +378,89 @@ class GoogleAIScraper:
                 except:
                     continue
 
-            print(f"Extracted {len(sources)} sources")
-
+            Log.ok(f"Extracted {len(sources)} sources")
         except Exception as e:
-            print(f"Error extracting sources: {e}")
+            Log.warn(f"Source extraction: {e}")
 
         return sources
 
-    def _take_screenshot(self, name: str = "debug"):
-        """Take a screenshot for debugging."""
-        try:
-            screenshot_dir = Path(__file__).parent.parent.parent / "data" / "screenshots"
-            screenshot_dir.mkdir(parents=True, exist_ok=True)
-            path = screenshot_dir / f"{name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
-            self._driver.save_screenshot(str(path))
-            print(f"Screenshot saved: {path}")
-            return path
-        except Exception as e:
-            print(f"Error taking screenshot: {e}")
-            return None
-
-    def scrape(self, query: str, take_screenshot: bool = False) -> ScrapeResult:
+    async def scrape(self, query: str, take_screenshot: bool = False) -> ScrapeResult:
         """Scrape Google AI Mode for a query."""
+        print(f"\n{C.CYAN}{C.BOLD}Google AI Scrape{C.RST}")
+        Log.data("Query", query)
+        
         timestamp = datetime.now(timezone.utc).isoformat()
+        html_content = ""
+        connectivity_info = {}
 
         try:
+            # Get target country for verification
+            target_country = None
+            if self.antidetect and self.antidetect.is_enabled:
+                target_country = getattr(self.antidetect.config, 'target_country', None)
+
+            # Verify VPN layer
+            vpn_result = self.chain.verify_vpn_layer(target_country)
+            
+            # Start browser
+            self._start_browser()
+            time.sleep(2)
+            
+            # Verify proxy layer via browser
+            proxy_result = self.chain.verify_proxy_layer(self._driver, target_country)
+            
+            # Build connectivity info
+            connectivity_info = {
+                "vpn": vpn_result,
+                "proxy": proxy_result,
+                "chain_valid": vpn_result.get("ip") != proxy_result.get("ip") if vpn_result.get("ip") and proxy_result.get("ip") else proxy_result.get("success", False)
+            }
+            
+            # Log chain status
+            print()
+            Log.result(vpn_result.get("success", False), f"VPN: {vpn_result.get('ip', 'N/A')} ({vpn_result.get('country_code', '?')})")
+            Log.result(proxy_result.get("success", False), f"Proxy: {proxy_result.get('ip', 'N/A')} ({proxy_result.get('country_code', '?')})")
+            if connectivity_info["chain_valid"]:
+                Log.result(True, "Chain valid")
+            print()
+
+            if take_screenshot:
+                self._screenshot("chain")
+
             # Build URL with AI Mode parameter
             encoded_query = quote_plus(query)
             url = f"{self.BASE_URL}?udm=50&q={encoded_query}"
 
-            print(f"Navigating to: {url}")
+            Log.step(f"Loading Google AI Mode", "nav")
             self._driver.get(url)
             time.sleep(2)
 
-            # Handle cookie consent
-            print("Handling cookie consent...")
             self._handle_cookie_consent()
-
-            # Wait for AI response
             self._wait_for_response()
 
             if take_screenshot:
-                self._take_screenshot(f"google_ai_{query[:20]}")
+                self._screenshot(f"google_ai_{query[:20]}")
 
-            # Extract response text
-            print("Extracting response text...")
+            try:
+                html_content = self._driver.page_source
+            except:
+                pass
+
+            Log.step("Extracting response", "extract")
             response_text = self._extract_response_text()
+            
+            if not response_text:
+                page_text = self._driver.find_element(By.TAG_NAME, "body").text
+                if "unusual traffic" in page_text.lower() or "robot" in page_text.lower():
+                    raise Exception("Blocked by Google (CAPTCHA/Unusual Traffic)")
 
-            # Extract sources
-            print("Extracting sources...")
+            Log.step("Extracting sources", "extract")
             sources = self._extract_sources()
 
             if take_screenshot:
-                self._take_screenshot(f"google_ai_final_{query[:20]}")
+                self._screenshot(f"google_ai_final_{query[:20]}")
+
+            Log.result(True, f"Done - {len(sources)} sources")
 
             return ScrapeResult(
                 query=query,
@@ -440,11 +469,22 @@ class GoogleAIScraper:
                 sources=[asdict(s) for s in sources],
                 source_count=len(sources),
                 success=True,
+                html_content=html_content,
+                connectivity_info=connectivity_info
             )
 
         except Exception as e:
+            Log.fail(f"Scrape failed: {e}")
+            
             if take_screenshot:
-                self._take_screenshot(f"google_ai_error")
+                self._screenshot("google_ai_error")
+            
+            if not html_content and self._driver:
+                try:
+                    html_content = self._driver.page_source
+                except:
+                    pass
+                    
             return ScrapeResult(
                 query=query,
                 timestamp=timestamp,
@@ -453,21 +493,20 @@ class GoogleAIScraper:
                 source_count=0,
                 success=False,
                 error=str(e),
+                html_content=html_content,
+                connectivity_info=connectivity_info
             )
 
     def save_result(self, result: ScrapeResult, output_dir: Path):
         """Save result to JSON file."""
         output_dir.mkdir(parents=True, exist_ok=True)
-
-        # Create filename from query
         filename = re.sub(r'[^\w\s-]', '', result.query.lower())
         filename = re.sub(r'[-\s]+', '_', filename)[:50]
         filename = f"{filename}.json"
-
         filepath = output_dir / filename
 
         with open(filepath, 'w', encoding='utf-8') as f:
             json.dump(asdict(result), f, indent=2, ensure_ascii=False)
 
-        print(f"Saved to: {filepath}")
+        Log.info(f"Saved: {filepath}")
         return filepath

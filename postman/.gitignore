@@ -1,0 +1,7 @@
+# Postman local files
+*.postman_environment.local.json
+*.postman_workspace.local.json
+
+# Personal environment files
+Personal.postman_environment.json
+Local-*.postman_environment.json

@@ -26,6 +26,13 @@ def main():
     query = sys.argv[1]
     headless = "--headless" in sys.argv
     screenshot = "--screenshot" in sys.argv
+    
+    # Parse proxy argument
+    proxy = None
+    for arg in sys.argv:
+        if arg.startswith("--proxy="):
+            proxy = arg.split("=")[1]
+            break
 
     # Output directory
     output_dir = Path(__file__).parent.parent / "data" / "results" / "google"
@@ -39,7 +46,7 @@ def main():
     print()
 
     # Run scraper
-    with GoogleAIScraper(headless=headless) as scraper:
+    with GoogleAIScraper(headless=headless, proxy=proxy) as scraper:
         result = scraper.scrape(query, take_screenshot=screenshot)
 
         if result.success:

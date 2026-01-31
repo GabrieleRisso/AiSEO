@@ -1,0 +1,243 @@
+{
+  "version": "1.2.0",
+  "last_updated": "2026-01-31",
+  "description": "Default configurations for AiSEO scrapers with geolocation verification and viewport profiles",
+  
+  "viewport_profiles": {
+    "description": "Device viewport configurations for different scraping needs",
+    "default_by_type": {
+      "phone": "iphone_14",
+      "tablet": "ipad_air",
+      "desktop": "desktop_1080p"
+    },
+    "phones": {
+      "iphone_14": {"width": 390, "height": 844, "scale": 3},
+      "iphone_15_pro": {"width": 393, "height": 852, "scale": 3},
+      "pixel_7": {"width": 412, "height": 915, "scale": 2.625},
+      "samsung_s23": {"width": 360, "height": 780, "scale": 3}
+    },
+    "tablets": {
+      "ipad_pro_12": {"width": 1024, "height": 1366, "scale": 2},
+      "ipad_air": {"width": 820, "height": 1180, "scale": 2},
+      "galaxy_tab_s8": {"width": 800, "height": 1280, "scale": 2}
+    },
+    "desktops": {
+      "desktop_1080p": {"width": 1920, "height": 1080, "scale": 1},
+      "desktop_1440p": {"width": 2560, "height": 1440, "scale": 1},
+      "macbook_pro_14": {"width": 1512, "height": 982, "scale": 2},
+      "macbook_air_13": {"width": 1470, "height": 956, "scale": 2},
+      "linux_desktop": {"width": 1920, "height": 1080, "scale": 1}
+    },
+    "custom_viewport_example": {"width": 800, "height": 600}
+  },
+  
+  "cost_estimation": {
+    "description": "Bright Data Scraping Browser pricing estimates",
+    "pricing": {
+      "per_gb_usd": 9.50,
+      "base_request_usd": 0.01,
+      "captcha_solve_usd": 0.02,
+      "avg_page_size_kb": 500
+    },
+    "estimates_per_scrape": {
+      "min_usd": 0.01,
+      "typical_usd": 0.015,
+      "with_captcha_usd": 0.035
+    },
+    "monthly_estimates": {
+      "100_scrapes": "$1.50",
+      "1000_scrapes": "$15.00",
+      "10000_scrapes": "$150.00"
+    }
+  },
+  
+  "perplexity": {
+    "status": "working",
+    "description": "Perplexity AI scraper - works with VPN + residential proxy",
+    "recommended_settings": {
+      "use_residential_proxy": true,
+      "headless": true,
+      "take_screenshot": true,
+      "human_behavior": true,
+      "profile": "desktop_1080p"
+    },
+    "network_config": {
+      "vpn_required": true,
+      "residential_proxy": true,
+      "proxy_type": "gost_sidecar",
+      "proxy_port": 8889,
+      "vpn_http_proxy_port": 8888
+    },
+    "supported_countries": ["it", "fr", "de", "nl", "es", "uk", "ch", "se"],
+    "anti_detection": {
+      "profile_rotation": true,
+      "language_match_country": true,
+      "stealth_scripts": true
+    },
+    "timeouts": {
+      "page_load": 120000,
+      "response_wait": 60000,
+      "element_wait": 30000
+    },
+    "notes": [
+      "VPN + Bright Data residential proxy chain works",
+      "Cookie consent handled automatically",
+      "Login popup dismissed automatically",
+      "Submit button uses multi-strategy click",
+      "Response extracted from .prose elements"
+    ]
+  },
+  
+  "google_ai": {
+    "status": "working",
+    "description": "Google AI Mode scraper - uses Scraping Browser with full text extraction and geolocation verification",
+    "recommended_settings": {
+      "use_scraping_browser": true,
+      "take_screenshot": true,
+      "scroll_full_page": true,
+      "profile": "desktop_1080p"
+    },
+    "profile_recommendations": {
+      "full_extraction": "desktop_1080p",
+      "mobile_view": "iphone_14",
+      "tablet_view": "ipad_air"
+    },
+    "geolocation": {
+      "description": "Country is set via -country-{code} flag in Bright Data endpoint",
+      "language_params": {
+        "description": "Google URL includes hl (language) and gl (geolocation) params",
+        "mapping": {
+          "it": {"hl": "it", "gl": "it"},
+          "fr": {"hl": "fr", "gl": "fr"},
+          "de": {"hl": "de", "gl": "de"},
+          "es": {"hl": "es", "gl": "es"},
+          "uk": {"hl": "en-GB", "gl": "uk"},
+          "nl": {"hl": "nl", "gl": "nl"},
+          "ch": {"hl": "de", "gl": "ch"},
+          "se": {"hl": "sv", "gl": "se"}
+        }
+      },
+      "verification": {
+        "method": "JavaScript fetch to ipinfo.io",
+        "logged_fields": ["ip", "country", "city", "region"],
+        "country_match_required": true
+      }
+    },
+    "screenshot_policy": {
+      "on_success": "final_only",
+      "on_error": "always",
+      "description": "Only final screenshot on success, always on error for debugging"
+    },
+    "extraction_features": [
+      "Full text extraction (no limits)",
+      "All links and sources captured",
+      "Document order preserved",
+      "Deduplication of content",
+      "Scroll-to-load for dynamic content"
+    ],
+    "network_chain_logging": {
+      "layer_1": "VPN (ProtonVPN via Gluetun) - shows target country",
+      "layer_2": "Bright Data Scraping Browser - shows IP/country/city verification",
+      "layer_3": "Device Profile - shows viewport and user agent"
+    },
+    "notes": [
+      "Scraping Browser handles CAPTCHA automatically",
+      "Cost estimated per request (~$0.015-0.035)",
+      "Supports phone/tablet/desktop profiles",
+      "AI Mode uses udm=50 parameter",
+      "Country geolocation verified via IP check after connection",
+      "Cookie consent text confirms correct language (e.g., 'Accetta tutto' for IT)"
+    ]
+  },
+  
+  "chatgpt": {
+    "status": "experimental",
+    "description": "ChatGPT scraper - requires authentication handling",
+    "notes": [
+      "ChatGPT requires login for full access",
+      "Consider using OpenAI API instead for reliability"
+    ]
+  },
+  
+  "bright_data_config": {
+    "customer_id": "hl_0d78e46f",
+    "residential_zone": "aiseo_1",
+    "residential_proxy": {
+      "host": "brd.superproxy.io",
+      "port": 33335,
+      "username_format": "brd-customer-{customer_id}-zone-{zone}-country-{country}",
+      "password": "m4n7fwxi32g8"
+    },
+    "scraping_browser": {
+      "endpoint": "wss://brd.superproxy.io:9222",
+      "auth_format": "brd-customer-{customer_id}-zone-{zone}-country-{country}:{password}",
+      "zone": "scraping_browser1",
+      "password": "baguzb7exf2p",
+      "full_endpoint_format": "wss://brd-customer-{customer_id}-zone-{zone}-country-{country}:{password}@brd.superproxy.io:9222",
+      "example_italy": "wss://brd-customer-hl_0d78e46f-zone-scraping_browser1-country-it:baguzb7exf2p@brd.superproxy.io:9222",
+      "selenium_endpoint": "https://brd-customer-hl_0d78e46f-zone-scraping_browser1:baguzb7exf2p@brd.superproxy.io:9515",
+      "features": [
+        "automatic_captcha_solving",
+        "fingerprint_management", 
+        "proxy_rotation",
+        "session_recovery",
+        "google_search_support",
+        "anti_bot_bypass",
+        "geolocation_targeting"
+      ]
+    },
+    "geolocation_targeting": {
+      "format": "-country-{country_code}",
+      "supported_countries": {
+        "it": "Italy",
+        "fr": "France", 
+        "de": "Germany",
+        "nl": "Netherlands",
+        "es": "Spain",
+        "uk": "United Kingdom",
+        "ch": "Switzerland",
+        "se": "Sweden"
+      }
+    }
+  },
+  
+  "vpn_config": {
+    "provider": "protonvpn",
+    "protocol": "wireguard",
+    "countries": {
+      "it": {
+        "name": "Italy",
+        "server": "146.70.182.2",
+        "public_key": "WeqHIUm2kUqZVMcr+6r5qxgM1FT9N/s/BAbEBPF/O0Q="
+      },
+      "fr": {
+        "name": "France",
+        "server": "185.159.157.1"
+      },
+      "de": {
+        "name": "Germany", 
+        "server": "185.159.156.1"
+      },
+      "nl": {
+        "name": "Netherlands",
+        "server": "185.159.158.1"
+      },
+      "es": {
+        "name": "Spain",
+        "server": "185.159.159.1"
+      },
+      "uk": {
+        "name": "United Kingdom",
+        "server": "185.159.160.1"
+      },
+      "ch": {
+        "name": "Switzerland",
+        "server": "185.159.161.1"
+      },
+      "se": {
+        "name": "Sweden",
+        "server": "185.159.162.1"
+      }
+    }
+  }
+}

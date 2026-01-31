@@ -66,3 +66,28 @@ class PromptSource(SQLModel, table=True):
     # Relationships
     prompt: Prompt = Relationship(back_populates="sources")
     source: Source = Relationship(back_populates="prompt_links")
+
+
+class ScrapeJob(SQLModel, table=True):
+    """Tracks asynchronous scraping jobs"""
+    id: int | None = Field(default=None, primary_key=True)
+    query: str
+    country: str
+    scraper_type: str = "google_ai"
+    status: str = "pending"  # pending, running, completed, failed
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    completed_at: datetime | None = None
+    error: str | None = None
+    proxy_used: str | None = None
+    profile_data: str | None = None  # JSON string of profile metadata
+    config_snapshot: str | None = None # JSON string of request config
+    html_snapshot: str | None = None # Full HTML content of the page
+    prompt_id: int | None = Field(default=None, foreign_key="prompt.id")
+    
+    # Scheduling fields
+    schedule_type: str = "once" # once, recurring
+    frequency: str | None = None # daily, weekly, monthly
+    next_run_at: datetime | None = None
+    is_active: bool = True
+    parent_job_id: int | None = Field(default=None, foreign_key="scrapejob.id")
+
