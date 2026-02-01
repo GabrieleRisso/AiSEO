@@ -250,8 +250,8 @@ def seed_brands():
     Seed initial brand data if database is empty.
     
     Creates default brands for tracking:
-    - Primary brand: Wix
-    - Competitors: Shopify, WooCommerce, BigCommerce, Squarespace
+    - Primary brand: TokenSpender
+    - Competitors: GEO/AI SEO industry competitors
     
     Handles race conditions when multiple workers start simultaneously.
     Uses merge() to safely insert/update brands.
@@ -260,17 +260,20 @@ def seed_brands():
     from database import engine
 
     brands_data = [
-        {"id": "wix", "name": "Wix", "type": "primary", "color": "#06b6d4"},
-        {"id": "shopify", "name": "Shopify", "type": "competitor", "color": "#f59e0b"},
-        {"id": "woocommerce", "name": "WooCommerce", "type": "competitor", "color": "#8b5cf6"},
-        {"id": "bigcommerce", "name": "BigCommerce", "type": "competitor", "color": "#ec4899"},
-        {"id": "squarespace", "name": "Squarespace", "type": "competitor", "color": "#10b981"},
+        {"id": "tokenspender", "name": "TokenSpender", "type": "primary", "color": "#06b6d4"},
+        {"id": "profound", "name": "Profound", "type": "competitor", "color": "#f59e0b"},
+        {"id": "airops", "name": "AirOps", "type": "competitor", "color": "#8b5cf6"},
+        {"id": "ahrefs", "name": "Ahrefs", "type": "competitor", "color": "#ec4899"},
+        {"id": "otterly-ai", "name": "Otterly.AI", "type": "competitor", "color": "#10b981"},
     ]
 
     with Session(engine) as session:
+        # Only seed if no brands exist
+        existing_brands = session.exec(select(Brand)).first()
+        if existing_brands:
+            return  # Don't overwrite existing brands
+            
         for brand_data in brands_data:
-            # Use merge to handle race condition with multiple workers
-            # merge() will insert if not exists, or update if exists
             brand = Brand(**brand_data)
             session.merge(brand)
         try:
@@ -990,6 +993,32 @@ def delete_brand(brand_id: str, session: Session = Depends(get_session)):
     session.commit()
 
     return {"success": True, "message": f"Brand '{brand_id}' deleted successfully"}
+
+
+@app.put(
+    "/api/brands/{brand_id}/set-primary",
+    tags=["brands"],
+    summary="Set a brand as primary",
+    description="Sets the specified brand as the primary brand. Only one brand can be primary at a time.",
+)
+def set_brand_primary(brand_id: str, session: Session = Depends(get_session)):
+    """Set a brand as the primary brand, demoting the current primary to competitor."""
+    brand = session.get(Brand, brand_id)
+    if not brand:
+        raise HTTPException(status_code=404, detail="Brand not found")
+    
+    # Demote current primary brand(s) to competitor
+    current_primaries = session.exec(select(Brand).where(Brand.type == "primary")).all()
+    for primary in current_primaries:
+        primary.type = "competitor"
+        session.add(primary)
+    
+    # Set new primary
+    brand.type = "primary"
+    session.add(brand)
+    session.commit()
+    
+    return {"success": True, "message": f"Brand '{brand.name}' is now the primary brand"}
 
 
 @app.get(
