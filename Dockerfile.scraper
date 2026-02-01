@@ -1,13 +1,21 @@
 FROM python:3.11-slim
 
-# Install system dependencies
+# Install system dependencies and Docker CLI
 RUN apt-get update && apt-get install -y \
     wget \
     gnupg \
     unzip \
     xvfb \
     curl \
+    ca-certificates \
     --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Docker CLI for container management
+RUN curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg \
+    && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian bookworm stable" > /etc/apt/sources.list.d/docker.list \
+    && apt-get update \
+    && apt-get install -y docker-ce-cli --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Google Chrome Stable
@@ -21,11 +29,25 @@ RUN wget -q -O chrome.deb https://dl.google.com/linux/direct/google-chrome-stabl
 WORKDIR /app
 
 # Copy project definition
-COPY pyproject.toml README.md ./
+COPY pyproject.toml ./
+
+# Create empty README.md if needed for pyproject.toml
+RUN touch README.md
 
 # Install python dependencies
-# We install directly from pyproject.toml
-RUN pip install . && pip install brightdata-sdk playwright
+RUN pip install --no-cache-dir \
+    fastapi \
+    uvicorn \
+    httpx \
+    selenium \
+    undetected-chromedriver \
+    webdriver-manager \
+    beautifulsoup4 \
+    lxml \
+    python-dotenv \
+    brightdata-sdk \
+    playwright \
+    pydantic
 
 # Install Playwright browsers (chromium only for smaller image)
 RUN playwright install chromium --with-deps

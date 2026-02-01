@@ -397,10 +397,14 @@ class ScrapingBrowserClient:
         """Take a screenshot."""
         from pathlib import Path
         from datetime import datetime
+        from ...utils.filename import sanitize_filename
         
         if not path:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             path = f"screenshot_{timestamp}.png"
+        else:
+            # Sanitize path if provided
+            path = sanitize_filename(path) + ".png" if not path.endswith('.png') else sanitize_filename(path[:-4]) + ".png"
         
         # Ensure directory exists
         ss_dir = Path(__file__).parent.parent.parent / "data" / "screenshots"

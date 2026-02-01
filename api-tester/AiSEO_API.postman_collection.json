@@ -1,0 +1,1250 @@
+{
+	"info": {
+		"_postman_id": "aiseo-api-collection-2026",
+		"name": "AiSEO API Collection",
+		"description": "Complete API collection for AiSEO scraper and backend services. Includes all endpoints with example requests, tests, and documentation.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "aiseo-api"
+	},
+	"item": [
+		{
+			"name": "Scraper API",
+			"item": [
+				{
+					"name": "Health Check",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{scraper_base_url}}/health",
+							"host": [
+								"{{scraper_base_url}}"
+							],
+							"path": [
+								"health"
+							]
+						},
+						"description": "Check if the scraper API is running and healthy."
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response time is less than 5000ms\", function () {",
+									"    pm.expect(pm.response.responseTime).to.be.below(5000);",
+									"});",
+									"",
+									"pm.test(\"Response is JSON\", function () {",
+									"    pm.response.to.be.json;",
+									"});",
+									"",
+									"pm.test(\"Response has status field\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property(\"status\");",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					]
+				},
+				{
+					"name": "Get Config",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{scraper_base_url}}/config",
+							"host": [
+								"{{scraper_base_url}}"
+							],
+							"path": [
+								"config"
+							]
+						},
+						"description": "Get available scraper configuration including supported scrapers and active proxies."
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response time is less than 5000ms\", function () {",
+									"    pm.expect(pm.response.responseTime).to.be.below(5000);",
+									"});",
+									"",
+									"pm.test(\"Response is JSON\", function () {",
+									"    pm.response.to.be.json;",
+									"});",
+									"",
+									"pm.test(\"Response has scrapers array\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property(\"scrapers\");",
+									"    pm.expect(jsonData.scrapers).to.be.an(\"array\");",
+									"});",
+									"",
+									"pm.test(\"Response has proxies array\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property(\"proxies\");",
+									"    pm.expect(jsonData.proxies).to.be.an(\"array\");",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					]
+				},
+				{
+					"name": "Scrape (One-time)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"query\": \"best seo tools\",\n    \"country\": \"us\",\n    \"num_results\": 10,\n    \"scraper_type\": \"google_ai\",\n    \"take_screenshot\": false,\n    \"headless\": true,\n    \"use_residential_proxy\": false\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{scraper_base_url}}/scrape",
+							"host": [
+								"{{scraper_base_url}}"
+							],
+							"path": [
+								"scrape"
+							]
+						},
+						"description": "Execute a one-time scraping job. This will immediately run the scraper with the provided configuration."
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response time is less than 5000ms\", function () {",
+									"    pm.expect(pm.response.responseTime).to.be.below(5000);",
+									"});",
+									"",
+									"pm.test(\"Response is JSON\", function () {",
+									"    pm.response.to.be.json;",
+									"});",
+									"",
+									"pm.test(\"Response has status field\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property(\"status\");",
+									"});",
+									"",
+									"pm.test(\"Response has metadata\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property(\"metadata\");",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					]
+				},
+				{
+					"name": "Scrape (With Anti-Detect)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"query\": \"best italian pasta brands\",\n    \"country\": \"it\",\n    \"num_results\": 10,\n    \"scraper_type\": \"google_ai\",\n    \"take_screenshot\": true,\n    \"headless\": false,\n    \"use_residential_proxy\": true,\n    \"anti_detect_config\": {\n        \"enabled\": true,\n        \"target_country\": \"IT\",\n        \"device_type\": \"desktop\",\n        \"os\": \"windows\",\n        \"browser\": \"chrome\",\n        \"human_typing\": true,\n        \"human_mouse\": true,\n        \"random_delays\": true\n    }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{scraper_base_url}}/scrape",
+							"host": [
+								"{{scraper_base_url}}"
+							],
+							"path": [
+								"scrape"
+							]
+						},
+						"description": "Execute a scraping job with anti-detection features enabled. Includes browser fingerprinting, human-like behavior, and residential proxy."
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response time is less than 5000ms\", function () {",
+									"    pm.expect(pm.response.responseTime).to.be.below(5000);",
+									"});",
+									"",
+									"pm.test(\"Response is JSON\", function () {",
+									"    pm.response.to.be.json;",
+									"});",
+									"",
+									"pm.test(\"Response has status field\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property(\"status\");",
+									"});",
+									"",
+									"pm.test(\"Response has metadata\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property(\"metadata\");",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					]
+				}
+			],
+			"description": "Endpoints for the Scraper API service running on port 5000."
+		},
+		{
+			"name": "Backend API",
+			"item": [
+				{
+					"name": "System",
+					"item": [
+						{
+							"name": "Health Check",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{backend_base_url}}/api/health",
+									"host": [
+										"{{backend_base_url}}"
+									],
+									"path": [
+										"api",
+										"health"
+									]
+								},
+								"description": "Check if the backend API is running and healthy."
+							},
+							"response": [],
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test(\"Status code is 200\", function () {",
+											"    pm.response.to.have.status(200);",
+											"});",
+											"",
+											"pm.test(\"Response time is less than 5000ms\", function () {",
+											"    pm.expect(pm.response.responseTime).to.be.below(5000);",
+											"});",
+											"",
+											"pm.test(\"Response is JSON\", function () {",
+											"    pm.response.to.be.json;",
+											"});",
+											"",
+											"pm.test(\"Response has status field\", function () {",
+											"    var jsonData = pm.response.json();",
+											"    pm.expect(jsonData).to.have.property(\"status\");",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							]
+						},
+						{
+							"name": "Get Config",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{backend_base_url}}/api/config",
+									"host": [
+										"{{backend_base_url}}"
+									],
+									"path": [
+										"api",
+										"config"
+									]
+								},
+								"description": "Get system configuration including available scrapers and proxies."
+							},
+							"response": [],
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test(\"Status code is 200\", function () {",
+											"    pm.response.to.have.status(200);",
+											"});",
+											"",
+											"pm.test(\"Response time is less than 5000ms\", function () {",
+											"    pm.expect(pm.response.responseTime).to.be.below(5000);",
+											"});",
+											"",
+											"pm.test(\"Response is JSON\", function () {",
+											"    pm.response.to.be.json;",
+											"});",
+											"",
+											"pm.test(\"Response has scrapers array\", function () {",
+											"    var jsonData = pm.response.json();",
+											"    pm.expect(jsonData).to.have.property(\"scrapers\");",
+											"    pm.expect(jsonData.scrapers).to.be.an(\"array\");",
+											"});",
+											"",
+											"pm.test(\"Response has proxies array\", function () {",
+											"    var jsonData = pm.response.json();",
+											"    pm.expect(jsonData).to.have.property(\"proxies\");",
+											"    pm.expect(jsonData.proxies).to.be.an(\"array\");",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							]
+						},
+						{
+							"name": "Get VPN Servers",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{backend_base_url}}/api/vpn/servers",
+									"host": [
+										"{{backend_base_url}}"
+									],
+									"path": [
+										"api",
+										"vpn",
+										"servers"
+									]
+								},
+								"description": "Get list of available ProtonVPN servers from Gluetun repository."
+							},
+							"response": [],
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test(\"Status code is 200\", function () {",
+											"    pm.response.to.have.status(200);",
+											"});",
+											"",
+											"pm.test(\"Response time is less than 5000ms\", function () {",
+											"    pm.expect(pm.response.responseTime).to.be.below(5000);",
+											"});",
+											"",
+											"pm.test(\"Response is JSON\", function () {",
+											"    pm.response.to.be.json;",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							]
+						}
+					],
+					"description": "System configuration and health endpoints."
+				},
+				{
+					"name": "Brands",
+					"item": [
+						{
+							"name": "List Brands",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{backend_base_url}}/api/brands",
+									"host": [
+										"{{backend_base_url}}"
+									],
+									"path": [
+										"api",
+										"brands"
+									]
+								},
+								"description": "Get all brands with visibility metrics for January 2026."
+							},
+							"response": [],
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test(\"Status code is 200\", function () {",
+											"    pm.response.to.have.status(200);",
+											"});",
+											"",
+											"pm.test(\"Response time is less than 5000ms\", function () {",
+											"    pm.expect(pm.response.responseTime).to.be.below(5000);",
+											"});",
+											"",
+											"pm.test(\"Response is JSON\", function () {",
+											"    pm.response.to.be.json;",
+											"});",
+											"",
+											"pm.test(\"Response is an array\", function () {",
+											"    pm.expect(pm.response.json()).to.be.an(\"array\");",
+											"});",
+											"",
+											"pm.test(\"Brands have required fields\", function () {",
+											"    var brands = pm.response.json();",
+											"    if (brands.length > 0) {",
+											"        pm.expect(brands[0]).to.have.property(\"id\");",
+											"        pm.expect(brands[0]).to.have.property(\"name\");",
+											"        pm.expect(brands[0]).to.have.property(\"visibility\");",
+											"    }",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							]
+						},
+						{
+							"name": "Get Brand Details",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{backend_base_url}}/api/brands/details",
+									"host": [
+										"{{backend_base_url}}"
+									],
+									"path": [
+										"api",
+										"brands",
+										"details"
+									]
+								},
+								"description": "Get detailed brand analytics with monthly breakdown."
+							},
+							"response": [],
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test(\"Status code is 200\", function () {",
+											"    pm.response.to.have.status(200);",
+											"});",
+											"",
+											"pm.test(\"Response time is less than 5000ms\", function () {",
+											"    pm.expect(pm.response.responseTime).to.be.below(5000);",
+											"});",
+											"",
+											"pm.test(\"Response is JSON\", function () {",
+											"    pm.response.to.be.json;",
+											"});",
+											"",
+											"pm.test(\"Response is an array\", function () {",
+											"    pm.expect(pm.response.json()).to.be.an(\"array\");",
+											"});",
+											"",
+											"pm.test(\"Brands have required fields\", function () {",
+											"    var brands = pm.response.json();",
+											"    if (brands.length > 0) {",
+											"        pm.expect(brands[0]).to.have.property(\"id\");",
+											"        pm.expect(brands[0]).to.have.property(\"name\");",
+											"        pm.expect(brands[0]).to.have.property(\"visibility\");",
+											"    }",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							]
+						},
+						{
+							"name": "Create Brand",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"id\": \"test-brand\",\n    \"name\": \"Test Brand\",\n    \"type\": \"competitor\",\n    \"color\": \"#ff0000\",\n    \"variations\": [\"Test\", \"Test Brand\", \"TB\"]\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{backend_base_url}}/api/brands",
+									"host": [
+										"{{backend_base_url}}"
+									],
+									"path": [
+										"api",
+										"brands"
+									]
+								},
+								"description": "Create a new brand. The system will automatically sync mentions from existing prompts."
+							},
+							"response": [],
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test(\"Status code is 200\", function () {",
+											"    pm.response.to.have.status(200);",
+											"});",
+											"",
+											"pm.test(\"Response time is less than 5000ms\", function () {",
+											"    pm.expect(pm.response.responseTime).to.be.below(5000);",
+											"});",
+											"",
+											"pm.test(\"Response is JSON\", function () {",
+											"    pm.response.to.be.json;",
+											"});",
+											"",
+											"pm.test(\"Response has brand details\", function () {",
+											"    var jsonData = pm.response.json();",
+											"    pm.expect(jsonData).to.have.property(\"id\");",
+											"    pm.expect(jsonData).to.have.property(\"name\");",
+											"});",
+											"",
+											"if (pm.response.code === 200 || pm.response.code === 201) {",
+											"    var brand = pm.response.json();",
+											"    pm.environment.set(\"last_brand_id\", brand.id);",
+											"}"
+										],
+										"type": "text/javascript"
+									}
+								}
+							]
+						},
+						{
+							"name": "Delete Brand",
+							"request": {
+								"method": "DELETE",
+								"header": [],
+								"url": {
+									"raw": "{{backend_base_url}}/api/brands/{{last_brand_id}}",
+									"host": [
+										"{{backend_base_url}}"
+									],
+									"path": [
+										"api",
+										"brands",
+										"{{last_brand_id}}"
+									]
+								},
+								"description": "Delete a brand and all its mentions. Cannot delete primary brand."
+							},
+							"response": [],
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test(\"Status code is 200\", function () {",
+											"    pm.response.to.have.status(200);",
+											"});",
+											"",
+											"pm.test(\"Response time is less than 5000ms\", function () {",
+											"    pm.expect(pm.response.responseTime).to.be.below(5000);",
+											"});",
+											"",
+											"pm.test(\"Response is JSON\", function () {",
+											"    pm.response.to.be.json;",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							]
+						}
+					],
+					"description": "Brand management endpoints."
+				},
+				{
+					"name": "Prompts",
+					"item": [
+						{
+							"name": "List Prompts",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{backend_base_url}}/api/prompts",
+									"host": [
+										"{{backend_base_url}}"
+									],
+									"path": [
+										"api",
+										"prompts"
+									]
+								},
+								"description": "Get all unique queries with aggregated stats across runs."
+							},
+							"response": [],
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test(\"Status code is 200\", function () {",
+											"    pm.response.to.have.status(200);",
+											"});",
+											"",
+											"pm.test(\"Response time is less than 5000ms\", function () {",
+											"    pm.expect(pm.response.responseTime).to.be.below(5000);",
+											"});",
+											"",
+											"pm.test(\"Response is JSON\", function () {",
+											"    pm.response.to.be.json;",
+											"});",
+											"",
+											"pm.test(\"Response has query field\", function () {",
+											"    var jsonData = pm.response.json();",
+											"    if (Array.isArray(jsonData)) {",
+											"        if (jsonData.length > 0) {",
+											"            pm.expect(jsonData[0]).to.have.property(\"query\");",
+											"        }",
+											"    } else {",
+											"        pm.expect(jsonData).to.have.property(\"query\");",
+											"    }",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							]
+						},
+						{
+							"name": "Get Prompt Detail",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{backend_base_url}}/api/prompts/query-1",
+									"host": [
+										"{{backend_base_url}}"
+									],
+									"path": [
+										"api",
+										"prompts",
+										"query-1"
+									]
+								},
+								"description": "Get detailed prompt info with all runs. Use query-1, query-2, etc. based on the order from list prompts."
+							},
+							"response": [],
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test(\"Status code is 200\", function () {",
+											"    pm.response.to.have.status(200);",
+											"});",
+											"",
+											"pm.test(\"Response time is less than 5000ms\", function () {",
+											"    pm.expect(pm.response.responseTime).to.be.below(5000);",
+											"});",
+											"",
+											"pm.test(\"Response is JSON\", function () {",
+											"    pm.response.to.be.json;",
+											"});",
+											"",
+											"pm.test(\"Response has query field\", function () {",
+											"    var jsonData = pm.response.json();",
+											"    if (Array.isArray(jsonData)) {",
+											"        if (jsonData.length > 0) {",
+											"            pm.expect(jsonData[0]).to.have.property(\"query\");",
+											"        }",
+											"    } else {",
+											"        pm.expect(jsonData).to.have.property(\"query\");",
+											"    }",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							]
+						}
+					],
+					"description": "Prompt and query management endpoints."
+				},
+				{
+					"name": "Sources",
+					"item": [
+						{
+							"name": "List Sources",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{backend_base_url}}/api/sources",
+									"host": [
+										"{{backend_base_url}}"
+									],
+									"path": [
+										"api",
+										"sources"
+									]
+								},
+								"description": "Get all sources with usage metrics."
+							},
+							"response": [],
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test(\"Status code is 200\", function () {",
+											"    pm.response.to.have.status(200);",
+											"});",
+											"",
+											"pm.test(\"Response time is less than 5000ms\", function () {",
+											"    pm.expect(pm.response.responseTime).to.be.below(5000);",
+											"});",
+											"",
+											"pm.test(\"Response is JSON\", function () {",
+											"    pm.response.to.be.json;",
+											"});",
+											"",
+											"pm.test(\"Response has domain field\", function () {",
+											"    var jsonData = pm.response.json();",
+											"    if (Array.isArray(jsonData)) {",
+											"        if (jsonData.length > 0) {",
+											"            pm.expect(jsonData[0]).to.have.property(\"domain\");",
+											"        }",
+											"    } else {",
+											"        pm.expect(jsonData).to.have.property(\"summary\");",
+											"    }",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							]
+						},
+						{
+							"name": "Get Source Analytics",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{backend_base_url}}/api/sources/analytics",
+									"host": [
+										"{{backend_base_url}}"
+									],
+									"path": [
+										"api",
+										"sources",
+										"analytics"
+									]
+								},
+								"description": "Get detailed source analytics including domain breakdown, source types, and top sources."
+							},
+							"response": [],
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test(\"Status code is 200\", function () {",
+											"    pm.response.to.have.status(200);",
+											"});",
+											"",
+											"pm.test(\"Response time is less than 5000ms\", function () {",
+											"    pm.expect(pm.response.responseTime).to.be.below(5000);",
+											"});",
+											"",
+											"pm.test(\"Response is JSON\", function () {",
+											"    pm.response.to.be.json;",
+											"});",
+											"",
+											"pm.test(\"Response has domain field\", function () {",
+											"    var jsonData = pm.response.json();",
+											"    if (Array.isArray(jsonData)) {",
+											"        if (jsonData.length > 0) {",
+											"            pm.expect(jsonData[0]).to.have.property(\"domain\");",
+											"        }",
+											"    } else {",
+											"        pm.expect(jsonData).to.have.property(\"summary\");",
+											"    }",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							]
+						}
+					],
+					"description": "Source and citation management endpoints."
+				},
+				{
+					"name": "Analytics",
+					"item": [
+						{
+							"name": "Get Metrics",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{backend_base_url}}/api/metrics",
+									"host": [
+										"{{backend_base_url}}"
+									],
+									"path": [
+										"api",
+										"metrics"
+									]
+								},
+								"description": "Get dashboard KPIs including visibility, position, and counts with month-over-month changes."
+							},
+							"response": [],
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test(\"Status code is 200\", function () {",
+											"    pm.response.to.have.status(200);",
+											"});",
+											"",
+											"pm.test(\"Response time is less than 5000ms\", function () {",
+											"    pm.expect(pm.response.responseTime).to.be.below(5000);",
+											"});",
+											"",
+											"pm.test(\"Response is JSON\", function () {",
+											"    pm.response.to.be.json;",
+											"});",
+											"",
+											"pm.test(\"Response has visibility metric\", function () {",
+											"    var jsonData = pm.response.json();",
+											"    pm.expect(jsonData).to.have.property(\"visibility\");",
+											"    pm.expect(jsonData).to.have.property(\"totalPrompts\");",
+											"    pm.expect(jsonData).to.have.property(\"totalSources\");",
+											"    pm.expect(jsonData).to.have.property(\"avgPosition\");",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							]
+						},
+						{
+							"name": "Get Visibility Data",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{backend_base_url}}/api/visibility",
+									"host": [
+										"{{backend_base_url}}"
+									],
+									"path": [
+										"api",
+										"visibility"
+									]
+								},
+								"description": "Get monthly visibility data for charts (Sep 2025 - Jan 2026)."
+							},
+							"response": [],
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test(\"Status code is 200\", function () {",
+											"    pm.response.to.have.status(200);",
+											"});",
+											"",
+											"pm.test(\"Response time is less than 5000ms\", function () {",
+											"    pm.expect(pm.response.responseTime).to.be.below(5000);",
+											"});",
+											"",
+											"pm.test(\"Response is JSON\", function () {",
+											"    pm.response.to.be.json;",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							]
+						},
+						{
+							"name": "Get Suggestions",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{backend_base_url}}/api/suggestions",
+									"host": [
+										"{{backend_base_url}}"
+									],
+									"path": [
+										"api",
+										"suggestions"
+									]
+								},
+								"description": "Get AI SEO improvement suggestions based on source data analysis."
+							},
+							"response": [],
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test(\"Status code is 200\", function () {",
+											"    pm.response.to.have.status(200);",
+											"});",
+											"",
+											"pm.test(\"Response time is less than 5000ms\", function () {",
+											"    pm.expect(pm.response.responseTime).to.be.below(5000);",
+											"});",
+											"",
+											"pm.test(\"Response is JSON\", function () {",
+											"    pm.response.to.be.json;",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							]
+						}
+					],
+					"description": "Analytics and reporting endpoints."
+				},
+				{
+					"name": "Jobs",
+					"item": [
+						{
+							"name": "List Jobs",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{backend_base_url}}/api/jobs?status=completed",
+									"host": [
+										"{{backend_base_url}}"
+									],
+									"path": [
+										"api",
+										"jobs"
+									],
+									"query": [
+										{
+											"key": "status",
+											"value": "completed",
+											"description": "Filter by status: pending, running, completed, failed, scheduled"
+										}
+									]
+								},
+								"description": "List all scrape jobs. Optionally filter by status."
+							},
+							"response": [],
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test(\"Status code is 200\", function () {",
+											"    pm.response.to.have.status(200);",
+											"});",
+											"",
+											"pm.test(\"Response time is less than 5000ms\", function () {",
+											"    pm.expect(pm.response.responseTime).to.be.below(5000);",
+											"});",
+											"",
+											"pm.test(\"Response is JSON\", function () {",
+											"    pm.response.to.be.json;",
+											"});",
+											"",
+											"pm.test(\"Response is an array\", function () {",
+											"    pm.expect(pm.response.json()).to.be.an(\"array\");",
+											"});",
+											"",
+											"var jobs = pm.response.json();",
+											"if (jobs.length > 0) {",
+											"    pm.environment.set(\"last_job_id\", jobs[0].id);",
+											"}"
+										],
+										"type": "text/javascript"
+									}
+								}
+							]
+						},
+						{
+							"name": "Create Scrape Job (One-time)",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"query\": \"best seo tools\",\n    \"country\": \"us\",\n    \"num_results\": 10,\n    \"scraper_type\": \"google_ai\",\n    \"device_type\": \"desktop\",\n    \"os_type\": \"windows\",\n    \"browser_type\": \"chrome\",\n    \"human_behavior\": true,\n    \"take_screenshot\": false,\n    \"run_in_background\": true,\n    \"use_residential_proxy\": false,\n    \"antidetect_enabled\": true\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{backend_base_url}}/api/jobs/scrape",
+									"host": [
+										"{{backend_base_url}}"
+									],
+									"path": [
+										"api",
+										"jobs",
+										"scrape"
+									]
+								},
+								"description": "Create a one-time scraping job that executes immediately."
+							},
+							"response": [],
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test(\"Status code is 200\", function () {",
+											"    pm.response.to.have.status(200);",
+											"});",
+											"",
+											"pm.test(\"Response time is less than 5000ms\", function () {",
+											"    pm.expect(pm.response.responseTime).to.be.below(5000);",
+											"});",
+											"",
+											"pm.test(\"Response is JSON\", function () {",
+											"    pm.response.to.be.json;",
+											"});",
+											"",
+											"pm.test(\"Response has job_id\", function () {",
+											"    var jsonData = pm.response.json();",
+											"    pm.expect(jsonData).to.have.property(\"job_id\");",
+											"});",
+											"",
+											"if (pm.response.code === 200 || pm.response.code === 201) {",
+											"    var job = pm.response.json();",
+											"    pm.environment.set(\"last_job_id\", job.job_id);",
+											"}"
+										],
+										"type": "text/javascript"
+									}
+								}
+							]
+						},
+						{
+							"name": "Create Scrape Job (Scheduled Daily)",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"query\": \"daily tracking query\",\n    \"country\": \"it\",\n    \"num_results\": 10,\n    \"scraper_type\": \"google_ai\",\n    \"device_type\": \"desktop\",\n    \"os_type\": \"windows\",\n    \"browser_type\": \"chrome\",\n    \"human_behavior\": true,\n    \"frequency\": \"daily\",\n    \"start_date\": \"2026-02-01T09:00:00\",\n    \"take_screenshot\": false,\n    \"run_in_background\": true,\n    \"use_residential_proxy\": true,\n    \"antidetect_enabled\": true\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{backend_base_url}}/api/jobs/scrape",
+									"host": [
+										"{{backend_base_url}}"
+									],
+									"path": [
+										"api",
+										"jobs",
+										"scrape"
+									]
+								},
+								"description": "Create a scheduled scraping job that runs daily. Change frequency to 'weekly' or 'hourly' as needed."
+							},
+							"response": [],
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test(\"Status code is 200\", function () {",
+											"    pm.response.to.have.status(200);",
+											"});",
+											"",
+											"pm.test(\"Response time is less than 5000ms\", function () {",
+											"    pm.expect(pm.response.responseTime).to.be.below(5000);",
+											"});",
+											"",
+											"pm.test(\"Response is JSON\", function () {",
+											"    pm.response.to.be.json;",
+											"});",
+											"",
+											"pm.test(\"Response has job_id\", function () {",
+											"    var jsonData = pm.response.json();",
+											"    pm.expect(jsonData).to.have.property(\"job_id\");",
+											"});",
+											"",
+											"if (pm.response.code === 200 || pm.response.code === 201) {",
+											"    var job = pm.response.json();",
+											"    pm.environment.set(\"last_job_id\", job.job_id);",
+											"}"
+										],
+										"type": "text/javascript"
+									}
+								}
+							]
+						},
+						{
+							"name": "Create Scrape Job (With Screenshot)",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"query\": \"best italian pasta brands\",\n    \"country\": \"it\",\n    \"num_results\": 10,\n    \"scraper_type\": \"google_ai\",\n    \"device_type\": \"desktop\",\n    \"os_type\": \"windows\",\n    \"browser_type\": \"chrome\",\n    \"human_behavior\": true,\n    \"take_screenshot\": true,\n    \"run_in_background\": false,\n    \"use_residential_proxy\": true,\n    \"antidetect_enabled\": true\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{backend_base_url}}/api/jobs/scrape",
+									"host": [
+										"{{backend_base_url}}"
+									],
+									"path": [
+										"api",
+										"jobs",
+										"scrape"
+									]
+								},
+								"description": "Create a scraping job with screenshot enabled. Set run_in_background to false to see the browser."
+							},
+							"response": [],
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test(\"Status code is 200\", function () {",
+											"    pm.response.to.have.status(200);",
+											"});",
+											"",
+											"pm.test(\"Response time is less than 5000ms\", function () {",
+											"    pm.expect(pm.response.responseTime).to.be.below(5000);",
+											"});",
+											"",
+											"pm.test(\"Response is JSON\", function () {",
+											"    pm.response.to.be.json;",
+											"});",
+											"",
+											"pm.test(\"Response has job_id\", function () {",
+											"    var jsonData = pm.response.json();",
+											"    pm.expect(jsonData).to.have.property(\"job_id\");",
+											"});",
+											"",
+											"if (pm.response.code === 200 || pm.response.code === 201) {",
+											"    var job = pm.response.json();",
+											"    pm.environment.set(\"last_job_id\", job.job_id);",
+											"}"
+										],
+										"type": "text/javascript"
+									}
+								}
+							]
+						}
+					],
+					"description": "Job management endpoints for creating and monitoring scraping jobs."
+				}
+			],
+			"description": "Endpoints for the Backend API service running on port 8000."
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Global pre-request script",
+					"// Add any common setup here"
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Global test script",
+					"// Add any common tests here"
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "scraper_base_url",
+			"value": "http://localhost:5000",
+			"type": "string"
+		},
+		{
+			"key": "backend_base_url",
+			"value": "http://localhost:8000",
+			"type": "string"
+		}
+	]
+}

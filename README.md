@@ -62,6 +62,20 @@ uvicorn main:app --reload --port 8000
 API available at: http://localhost:8000
 API docs at: http://localhost:8000/docs
 
+## 📚 API Documentation
+
+Complete API documentation is available in the `docs/` folder:
+
+- **[API Reference](docs/api/README.md)** - Complete endpoint documentation
+- **[Examples](docs/examples/README.md)** - Request/response examples and code samples
+- **[Postman Collection](docs/postman/README.md)** - Postman setup and usage guide
+
+**Interactive Documentation:**
+- **Backend Swagger UI**: http://localhost:8000/docs
+- **Backend ReDoc**: http://localhost:8000/redoc
+- **Scraper API Docs**: http://localhost:5000/docs
+- **Postman**: http://localhost:8000/docs/postman
+
 ### 2. Frontend Setup
 
 ```bash
@@ -146,25 +160,21 @@ Results saved to: `data/results/google/{query}.json`
 
 ## API Endpoints
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/health` | GET | Health check |
-| `/api/brands` | GET | List all brands with visibility metrics |
-| `/api/brands/details` | GET | Detailed brand analytics with monthly breakdown |
-| `/api/brands` | POST | Create new brand (auto-syncs mentions) |
-| `/api/brands/{id}` | DELETE | Delete brand and all mentions |
-| `/api/prompts` | GET | List prompts with aggregated stats |
-| `/api/prompts/{id}` | GET | Prompt detail with all runs |
-| `/api/sources` | GET | List sources with usage metrics |
-| `/api/sources/analytics` | GET | Detailed source analytics (types, domains) |
-| `/api/metrics` | GET | Dashboard KPIs (visibility, position, counts) |
-| `/api/visibility` | GET | Monthly visibility data for charts |
-| `/api/suggestions` | GET | AI SEO improvement suggestions |
+See [API Documentation](docs/API.md) for complete endpoint reference.
 
-## Project Structure
+**Quick Links:**
+- [API Reference](docs/api/README.md) - All endpoints
+- [Examples](docs/examples/README.md) - Code samples
+- [Postman Collection](docs/postman/README.md) - Testing guide
+
+## 📁 Project Structure
 
 ```
 AiSEO/
+├── docs/                         # 📚 All API documentation
+│   ├── api/                      # API endpoint reference
+│   ├── examples/                 # Code examples
+│   └── postman/                  # Postman collection
 ├── backend/                      # FastAPI backend
 │   ├── main.py                   # API endpoints (1200+ lines)
 │   ├── models.py                 # SQLModel ORM models

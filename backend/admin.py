@@ -60,65 +60,50 @@ class ScrapeJobAdmin(ModelView, model=ScrapeJob):
     name_plural = "Scrape Jobs"
     icon = "fa-solid fa-spider"
     
-    # List page configuration
+    # List page configuration - use string names for columns
     column_list = [
-        ScrapeJob.id,
-        ScrapeJob.query,
-        ScrapeJob.country,
-        ScrapeJob.scraper_type,
-        ScrapeJob.status,
-        ScrapeJob.created_at,
-        ScrapeJob.completed_at,
-        ScrapeJob.prompt_id,
+        "id",
+        "query",
+        "country",
+        "scraper_type",
+        "status",
+        "created_at",
+        "completed_at",
+        "prompt_id",
     ]
     
-    column_searchable_list = [ScrapeJob.query, ScrapeJob.country, ScrapeJob.error]
-    column_sortable_list = [
-        ScrapeJob.id, 
-        ScrapeJob.query, 
-        ScrapeJob.status, 
-        ScrapeJob.created_at,
-        ScrapeJob.completed_at,
-    ]
-    column_default_sort = [(ScrapeJob.id, True)]  # Newest first
+    column_searchable_list = ["query", "country", "error"]
+    column_sortable_list = ["id", "query", "status", "created_at", "completed_at"]
+    column_default_sort = [("id", True)]  # Newest first
     
     # Detail page - show all fields
     column_details_list = [
-        ScrapeJob.id,
-        ScrapeJob.query,
-        ScrapeJob.country,
-        ScrapeJob.scraper_type,
-        ScrapeJob.status,
-        ScrapeJob.created_at,
-        ScrapeJob.completed_at,
-        ScrapeJob.error,
-        ScrapeJob.proxy_used,
-        ScrapeJob.profile_data,
-        ScrapeJob.config_snapshot,
-        ScrapeJob.html_snapshot,
-        ScrapeJob.prompt_id,
-        ScrapeJob.schedule_type,
-        ScrapeJob.frequency,
-        ScrapeJob.next_run_at,
-        ScrapeJob.is_active,
-        ScrapeJob.parent_job_id,
+        "id",
+        "query",
+        "country",
+        "scraper_type",
+        "status",
+        "created_at",
+        "completed_at",
+        "error",
+        "proxy_used",
+        "profile_data",
+        "config_snapshot",
+        "html_snapshot",
+        "prompt_id",
+        "schedule_type",
+        "frequency",
+        "next_run_at",
+        "is_active",
+        "parent_job_id",
     ]
     
     # Format long text fields
     column_formatters = {
-        ScrapeJob.html_snapshot: lambda m, a: f"[HTML: {len(m.html_snapshot or '')} chars]" if m.html_snapshot else None,
-        ScrapeJob.config_snapshot: lambda m, a: f"[JSON: {len(m.config_snapshot or '')} chars]" if m.config_snapshot else None,
-        ScrapeJob.profile_data: lambda m, a: f"[JSON: {len(m.profile_data or '')} chars]" if m.profile_data else None,
+        "html_snapshot": lambda m, a: f"[HTML: {len(m.html_snapshot or '')} chars]" if m.html_snapshot else None,
+        "config_snapshot": lambda m, a: f"[JSON: {len(m.config_snapshot or '')} chars]" if m.config_snapshot else None,
+        "profile_data": lambda m, a: f"[JSON: {len(m.profile_data or '')} chars]" if m.profile_data else None,
     }
-    
-    # Filters
-    column_filters = [
-        ScrapeJob.status,
-        ScrapeJob.country,
-        ScrapeJob.scraper_type,
-        ScrapeJob.schedule_type,
-        ScrapeJob.is_active,
-    ]
     
     # Page size
     page_size = 25
@@ -136,27 +121,16 @@ class PromptAdmin(ModelView, model=Prompt):
     name_plural = "Prompts"
     icon = "fa-solid fa-comment"
     
-    column_list = [
-        Prompt.id,
-        Prompt.query,
-        Prompt.run_number,
-        Prompt.scraped_at,
-    ]
+    column_list = ["id", "query", "run_number", "scraped_at"]
     
-    column_searchable_list = [Prompt.query, Prompt.response_text]
-    column_sortable_list = [Prompt.id, Prompt.query, Prompt.run_number, Prompt.scraped_at]
-    column_default_sort = [(Prompt.id, True)]
+    column_searchable_list = ["query", "response_text"]
+    column_sortable_list = ["id", "query", "run_number", "scraped_at"]
+    column_default_sort = [("id", True)]
     
-    column_details_list = [
-        Prompt.id,
-        Prompt.query,
-        Prompt.run_number,
-        Prompt.response_text,
-        Prompt.scraped_at,
-    ]
+    column_details_list = ["id", "query", "run_number", "response_text", "scraped_at"]
     
     column_formatters = {
-        Prompt.response_text: lambda m, a: f"{(m.response_text or '')[:100]}..." if m.response_text and len(m.response_text) > 100 else m.response_text,
+        "response_text": lambda m, a: f"{(m.response_text or '')[:100]}..." if m.response_text and len(m.response_text) > 100 else m.response_text,
     }
     
     page_size = 25
@@ -170,11 +144,9 @@ class BrandAdmin(ModelView, model=Brand):
     name_plural = "Brands"
     icon = "fa-solid fa-tag"
     
-    column_list = [Brand.id, Brand.name, Brand.type, Brand.color, Brand.variations]
-    column_searchable_list = [Brand.id, Brand.name, Brand.variations]
-    column_sortable_list = [Brand.id, Brand.name, Brand.type]
-    
-    column_filters = [Brand.type]
+    column_list = ["id", "name", "type", "color", "variations"]
+    column_searchable_list = ["id", "name", "variations"]
+    column_sortable_list = ["id", "name", "type"]
     
     page_size = 25
     can_export = True
@@ -187,32 +159,14 @@ class PromptBrandMentionAdmin(ModelView, model=PromptBrandMention):
     name_plural = "Brand Mentions"
     icon = "fa-solid fa-at"
     
-    column_list = [
-        PromptBrandMention.id,
-        PromptBrandMention.prompt_id,
-        PromptBrandMention.brand_id,
-        PromptBrandMention.mentioned,
-        PromptBrandMention.position,
-        PromptBrandMention.sentiment,
-    ]
+    column_list = ["id", "prompt_id", "brand_id", "mentioned", "position", "sentiment"]
     
-    column_searchable_list = [PromptBrandMention.context]
-    column_sortable_list = [
-        PromptBrandMention.id,
-        PromptBrandMention.prompt_id,
-        PromptBrandMention.brand_id,
-        PromptBrandMention.position,
-    ]
-    column_default_sort = [(PromptBrandMention.id, True)]
-    
-    column_filters = [
-        PromptBrandMention.brand_id,
-        PromptBrandMention.mentioned,
-        PromptBrandMention.sentiment,
-    ]
+    column_searchable_list = ["context"]
+    column_sortable_list = ["id", "prompt_id", "brand_id", "position"]
+    column_default_sort = [("id", True)]
     
     column_formatters = {
-        PromptBrandMention.context: lambda m, a: f"{(m.context or '')[:80]}..." if m.context and len(m.context) > 80 else m.context,
+        "context": lambda m, a: f"{(m.context or '')[:80]}..." if m.context and len(m.context) > 80 else m.context,
     }
     
     page_size = 25
@@ -226,23 +180,15 @@ class SourceAdmin(ModelView, model=Source):
     name_plural = "Sources"
     icon = "fa-solid fa-link"
     
-    column_list = [
-        Source.id,
-        Source.domain,
-        Source.url,
-        Source.title,
-        Source.published_date,
-    ]
+    column_list = ["id", "domain", "url", "title", "published_date"]
     
-    column_searchable_list = [Source.domain, Source.url, Source.title, Source.description]
-    column_sortable_list = [Source.id, Source.domain, Source.title]
-    column_default_sort = [(Source.id, True)]
-    
-    column_filters = [Source.domain]
+    column_searchable_list = ["domain", "url", "title", "description"]
+    column_sortable_list = ["id", "domain", "title"]
+    column_default_sort = [("id", True)]
     
     column_formatters = {
-        Source.url: lambda m, a: f"{m.url[:60]}..." if len(m.url) > 60 else m.url,
-        Source.description: lambda m, a: f"{(m.description or '')[:80]}..." if m.description and len(m.description) > 80 else m.description,
+        "url": lambda m, a: f"{m.url[:60]}..." if len(m.url) > 60 else m.url,
+        "description": lambda m, a: f"{(m.description or '')[:80]}..." if m.description and len(m.description) > 80 else m.description,
     }
     
     page_size = 25
@@ -256,20 +202,10 @@ class PromptSourceAdmin(ModelView, model=PromptSource):
     name_plural = "Prompt Sources"
     icon = "fa-solid fa-link"
     
-    column_list = [
-        PromptSource.id,
-        PromptSource.prompt_id,
-        PromptSource.source_id,
-        PromptSource.citation_order,
-    ]
+    column_list = ["id", "prompt_id", "source_id", "citation_order"]
     
-    column_sortable_list = [
-        PromptSource.id,
-        PromptSource.prompt_id,
-        PromptSource.source_id,
-        PromptSource.citation_order,
-    ]
-    column_default_sort = [(PromptSource.id, True)]
+    column_sortable_list = ["id", "prompt_id", "source_id", "citation_order"]
+    column_default_sort = [("id", True)]
     
     page_size = 25
     can_export = True

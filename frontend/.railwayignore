@@ -1,0 +1,5 @@
+# Ignore files when uploading to Railway
+node_modules
+dist
+.git
+*.md

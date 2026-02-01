@@ -9,6 +9,7 @@ A web-based API testing interface for the AiSEO project, similar to Postman. Tes
 - **Response Viewer**: View formatted JSON responses with status codes and timing
 - **Log Viewer**: View real-time logs from Docker containers
 - **Pre-configured Endpoints**: Click endpoints in the sidebar to quickly test common API calls
+- **Postman Integration**: Download Postman collection and environment files directly from the interface
 
 ## Usage
 
@@ -97,6 +98,18 @@ python server.py
 ```bash
 docker build -t aiseo-api-tester ./api-tester
 ```
+
+## Postman Collection
+
+The API Tester includes Postman collection files:
+
+- **Download Collection**: Click "Download Postman Collection" button in the sidebar
+- **Download Environment**: Click "Download Environment" button in the sidebar
+- **Direct URLs**: 
+  - Collection: http://localhost:9000/postman/collection
+  - Environment: http://localhost:9000/postman/environment
+
+See [POSTMAN.md](./POSTMAN.md) for detailed Postman setup instructions.
 
 ## Notes
 

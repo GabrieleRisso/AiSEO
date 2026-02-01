@@ -2,6 +2,8 @@ import os
 from typing import List
 from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse, FileResponse
 from sqlmodel import Session, select, func
 from datetime import datetime, timedelta
 from collections import Counter
@@ -11,6 +13,9 @@ import json
 from pydantic import BaseModel, Field
 
 from database import create_db_and_tables, get_session, engine
+
+# Scraper API URL - configurable for production vs local
+SCRAPER_API_URL = os.getenv("SCRAPER_API_URL", "http://aiseo-scraper:5000")
 from models import Brand, Prompt, PromptBrandMention, Source, PromptSource, ScrapeJob, DailyStats, PromptTemplate
 from admin import setup_admin
 from schemas import (
@@ -42,30 +47,58 @@ from schemas import (
 app = FastAPI(
     title="AiSEO API",
     description="""
-    Backend API for AiSEO platform. Provides endpoints for managing brands, prompts, sources,
-    analytics, and scraping jobs.
+    # AiSEO API Documentation
+    
+    Backend API for AiSEO platform - Track brand visibility in AI-generated search results.
+    
+    ## Quick Start
+    
+    - **Interactive Docs**: [Swagger UI](/docs) | [ReDoc](/redoc)
+    - **Postman Collection**: [Run in Postman](https://www.postman.com/collections/aiseo-api)
+    - **Base URL**: `http://localhost:8000/api`
     
     ## Features
+    
     - **Brand Management**: Track brand visibility and mentions across AI responses
-    - **Prompt Analytics**: Analyze query performance and brand positioning
+    - **Prompt Analytics**: Analyze query performance and brand positioning  
     - **Source Analytics**: Track citation sources and domains
     - **Job Management**: Create and monitor scraping jobs
     - **Dashboard Metrics**: Get KPIs and visibility trends
     
     ## Authentication
+    
     Currently no authentication required. All endpoints are publicly accessible.
     
     ## Rate Limiting
+    
     No rate limiting currently implemented. Use responsibly.
+    
+    ## Examples
+    
+    See [Examples Documentation](/docs/examples) for request/response examples.
     """,
     version="1.0.0",
     contact={
         "name": "AiSEO API Support",
+        "url": "https://github.com/yourorg/aiseo",
     },
+    license_info={
+        "name": "MIT",
+    },
+    servers=[
+        {
+            "url": "http://localhost:8000",
+            "description": "Local development server",
+        },
+        {
+            "url": "https://api.aiseo.example.com",
+            "description": "Production server",
+        },
+    ],
     tags_metadata=[
         {
             "name": "health",
-            "description": "Health check endpoints",
+            "description": "Health check endpoints for service monitoring",
         },
         {
             "name": "system",
@@ -73,29 +106,32 @@ app = FastAPI(
         },
         {
             "name": "brands",
-            "description": "Brand management and analytics endpoints",
+            "description": "Brand management and analytics endpoints. Track brand visibility, mentions, and sentiment across AI responses.",
         },
         {
             "name": "prompts",
-            "description": "Prompt and query management endpoints",
+            "description": "Prompt and query management endpoints. View scraped queries and their results.",
         },
         {
             "name": "sources",
-            "description": "Source and citation management endpoints",
+            "description": "Source and citation management endpoints. Track which websites are cited by AI systems.",
         },
         {
             "name": "analytics",
-            "description": "Analytics, metrics, and reporting endpoints",
+            "description": "Analytics, metrics, and reporting endpoints. Get KPIs, visibility trends, and SEO suggestions.",
         },
         {
             "name": "jobs",
-            "description": "Scraping job management endpoints",
+            "description": "Scraping job management endpoints. Create and monitor scraping jobs for tracking brand visibility.",
         },
     ],
 )
 
-# CORS for frontend - read from environment variable
-cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(",")
+# CORS for frontend and admin dashboard - read from environment variable
+cors_origins = os.getenv(
+    "CORS_ORIGINS", 
+    "http://localhost:5173,http://127.0.0.1:5173,http://localhost:9091,http://127.0.0.1:9091,http://localhost:8000"
+).split(",")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[origin.strip() for origin in cors_origins],
@@ -114,6 +150,93 @@ app.add_middleware(
 # Setup SQLAdmin database viewer at /admin
 # Access the UI at http://localhost:8000/admin
 setup_admin(app, engine)
+
+# Custom ReDoc with Postman button
+@app.get("/redoc", include_in_schema=False)
+async def redoc_html():
+    """Custom ReDoc page with Postman integration."""
+    html_content = """
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AiSEO API Documentation - ReDoc</title>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://fonts.googleapis.com/css?family=Montserrat:300,400,700|Roboto:300,400,700" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+        .postman-button {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            background: #FF6C37;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 4px;
+            text-decoration: none;
+            font-family: 'Roboto', sans-serif;
+            font-weight: 500;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            transition: background 0.3s;
+        }
+        .postman-button:hover {
+            background: #E55A2B;
+        }
+        .docs-links {
+            position: fixed;
+            top: 70px;
+            right: 20px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .docs-link {
+            background: #4A90E2;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 4px;
+            text-decoration: none;
+            font-family: 'Roboto', sans-serif;
+            font-size: 14px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            transition: background 0.3s;
+        }
+        .docs-link:hover {
+            background: #357ABD;
+        }
+    </style>
+</head>
+<body>
+    <a href="/docs/postman" target="_blank" class="postman-button">
+        🚀 Run in Postman
+    </a>
+    <div class="docs-links">
+        <a href="/docs" class="docs-link">Swagger UI</a>
+        <a href="/docs/examples" class="docs-link">Examples</a>
+    </div>
+    <redoc spec-url='/openapi.json'></redoc>
+    <script src="https://cdn.redoc.ly/redoc/latest/bundles/redoc.standalone.js"></script>
+</body>
+</html>
+    """
+    return HTMLResponse(content=html_content)
+
+# Serve static docs if directory exists (relative to project root)
+docs_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "docs")
+if os.path.exists(docs_path):
+    app.mount("/docs", StaticFiles(directory=docs_path, html=True), name="docs")
+
+# Postman collection endpoint (redirects to api-tester)
+@app.get("/docs/postman", include_in_schema=False)
+async def postman_collection():
+    """Postman collection download page - redirects to api-tester."""
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="http://localhost:9000/postman/collection")
 
 
 @app.on_event("startup")
@@ -1899,6 +2022,8 @@ async def run_scrape_logic(job_id: int, config: dict):
             "country": config.get("country"),
             "num_results": config.get("num_results", 10),
             "scraper_type": config.get("scraper_type", "google_ai"),
+            "job_id": job_id,  # Pass job_id for log correlation
+            "proxy_layer": config.get("proxy_layer", "auto"),  # Pass proxy layer preference
             "anti_detect_config": {
                 "enabled": config.get("antidetect_enabled", True),
                 "target_country": config.get("country", "us").upper(),
@@ -1909,7 +2034,7 @@ async def run_scrape_logic(job_id: int, config: dict):
                 "human_mouse": config.get("human_behavior", True),
                 "random_delays": config.get("human_behavior", True)
             },
-            "take_screenshot": config.get("take_screenshot", False),
+            "take_screenshot": config.get("take_screenshot", True),  # Always take screenshots for debugging
             "headless": config.get("run_in_background", True),
             "use_residential_proxy": config.get("use_residential_proxy", False),
             "use_scraping_browser": config.get("use_scraping_browser", False),
@@ -1920,22 +2045,19 @@ async def run_scrape_logic(job_id: int, config: dict):
             "scroll_full_page": config.get("scroll_full_page", True),
         }
         
-        # Log the full request config
-        print(f"\n[Scrape Job {job_id}] Request Config:")
-        print(f"  Query: {payload['query']}")
-        print(f"  Country: {payload['country']}")
-        print(f"  Scraper: {payload['scraper_type']}")
-        print(f"  Profile: {payload['profile']}")
-        print(f"  Scraping Browser: {payload['use_scraping_browser']}")
-        print(f"  Residential Proxy: {payload['use_residential_proxy']}")
+        # Log job start
+        print(f"[job:{job_id}] START query=\"{payload['query']}\" country={payload['country']} scraper={payload['scraper_type']} layer={payload['proxy_layer']} profile={payload['profile']}")
         
         # Call scraper service
         # Increased timeout for Bright Data SDK or browser wait
+        start_time = datetime.utcnow()
         response = requests.post(
-            "http://aiseo-scraper:5000/scrape",
+            f"{SCRAPER_API_URL}/scrape",
             json=payload,
             timeout=600 
         )
+        end_time = datetime.utcnow()
+        duration = (end_time - start_time).total_seconds()
         
         if response.status_code != 200:
             raise Exception(f"Scraper error: {response.text}")
@@ -1948,11 +2070,27 @@ async def run_scrape_logic(job_id: int, config: dict):
                 # Always save HTML if available, regardless of status
                 if result.get("html_content"):
                      scrape_job.html_snapshot = result.get("html_content")[:1000000]
+                     scrape_job.response_size_kb = len(result.get("html_content", "")) / 1024
                 
                 # Update metadata
                 scrape_job.proxy_used = result.get("metadata", {}).get("proxy_used")
                 scrape_job.profile_data = json.dumps(result.get("metadata", {}))
-                scrape_job.completed_at = datetime.utcnow()
+                scrape_job.completed_at = end_time
+                scrape_job.duration_seconds = duration
+                
+                # Extract proxy layer info from metadata
+                proxy_layer = result.get("metadata", {}).get("proxy_layer", {})
+                if proxy_layer:
+                    scrape_job.layer2_mode = proxy_layer.get("layer2_mode")
+                    origin = proxy_layer.get("origin", {})
+                    if origin:
+                        scrape_job.origin_ip = origin.get("ip")
+                        scrape_job.origin_country = origin.get("country")
+                        scrape_job.origin_verified = origin.get("verified", False)
+                
+                # Estimate cost based on layer2_mode
+                cost_map = {"direct": 0, "residential": 0.004, "unlocker": 0.008, "browser": 0.025}
+                scrape_job.estimated_cost_usd = cost_map.get(scrape_job.layer2_mode, 0)
 
                 if result.get("status") == "failed":
                     scrape_job.status = "failed"
@@ -2011,20 +2149,14 @@ async def run_scrape_logic(job_id: int, config: dict):
         with Session(engine) as session:
             scrape_job = session.get(ScrapeJob, job_id)
             if scrape_job:
-                            scrape_job.status = "failed"
-                            scrape_job.error = str(e)
-                            scrape_job.completed_at = datetime.utcnow()
-                            
-                            # Try to save HTML even on failure if returned in exception-like dict or accessible
-                            # Since we don't have access to result here if request failed, this is tricky.
-                            # But if the scraper service returned a 200 with status="failed", we handled it above.
-                            # This block catches exceptions in run_scrape_logic itself (like connection errors).
-                            # If scraper returned 200 but failed status, it's handled in the try block logic (raising Exception).
-                            # We should extract HTML from that exception message if possible, or result if available?
-                            # Actually, we should refactor run_scrape_logic to handle the failed result properly without raising immediately.
-                            
-                            session.add(scrape_job)
-                            session.commit()
+                scrape_job.status = "failed"
+                scrape_job.error = str(e)[:500]  # Truncate long errors
+                scrape_job.completed_at = datetime.utcnow()
+                # Calculate duration if start_time was set
+                if 'start_time' in dir():
+                    scrape_job.duration_seconds = (datetime.utcnow() - start_time).total_seconds()
+                session.add(scrape_job)
+                session.commit()
         return None
 
 @app.on_event("startup")
@@ -2080,7 +2212,7 @@ def get_vpn_servers():
         # Try to get active proxies from scraper service first
         active_proxies = []
         try:
-            resp = requests.get("http://aiseo-scraper:5000/config", timeout=2)
+            resp = requests.get(f"{SCRAPER_API_URL}/config", timeout=2)
             if resp.status_code == 200:
                 active_proxies = resp.json().get("proxies", [])
         except:
@@ -2149,7 +2281,7 @@ def get_system_config():
     fallback configuration if service is unavailable.
     """
     try:
-        response = requests.get("http://aiseo-scraper:5000/config", timeout=5)
+        response = requests.get(f"{SCRAPER_API_URL}/config", timeout=5)
         if response.status_code == 200:
             return response.json()
     except:
@@ -2188,11 +2320,24 @@ class JobRequest(BaseModel):
     )
     start_date: datetime | None = Field(default=None, description="Start date for scheduled jobs (ISO format). Defaults to now if not provided", example=None)
     
+    # Proxy Layer Selection
+    proxy_layer: str = Field(
+        default="auto",
+        description="""Proxy layer to use. Options:
+        - 'auto': Automatically select best layer (unlocker for google_ai, browser for chatgpt)
+        - 'direct': VPN only - cheapest but may hit CAPTCHA (~70% success)
+        - 'residential': VPN + residential proxy (~85% success, $0.004/req)
+        - 'unlocker': Web Unlocker API (~95% success, $0.008/req)
+        - 'browser': Cloud Browser with JS execution (~98% success, $0.025/req)
+        """,
+        example="unlocker"
+    )
+    
     # Debugging
-    take_screenshot: bool = Field(default=False, description="Capture screenshot during scraping", example=False)
+    take_screenshot: bool = Field(default=True, description="Capture screenshot during scraping (always on for debugging)", example=True)
     run_in_background: bool = Field(default=True, description="Run browser in headless mode. Set false to see browser", example=True)
-    use_residential_proxy: bool = Field(default=False, description="Use residential proxy instead of datacenter VPN", example=False)
-    use_scraping_browser: bool = Field(default=False, description="Use Bright Data Scraping Browser (cloud browser with CAPTCHA solving)", example=False)
+    use_residential_proxy: bool = Field(default=False, description="[DEPRECATED] Use proxy_layer='residential' instead", example=False)
+    use_scraping_browser: bool = Field(default=False, description="[DEPRECATED] Use proxy_layer='browser' instead", example=False)
     antidetect_enabled: bool = Field(default=True, description="Enable anti-detection browser fingerprinting", example=True)
     
     # Viewport/Profile settings for Scraping Browser
@@ -2460,14 +2605,14 @@ def get_job_html(job_id: int):
         }
     }
 )
-def list_jobs(status: str | None = None):
+def list_jobs(status: str | None = None, limit: int = 200):
     """
     List all scrape jobs.
     
     Optionally filter by status. Results are ordered by creation time descending.
     """
     with Session(engine) as session:
-        query = select(ScrapeJob).order_by(ScrapeJob.created_at.desc())
+        query = select(ScrapeJob).order_by(ScrapeJob.created_at.desc()).limit(limit)
         if status:
             query = query.where(ScrapeJob.status == status)
         
@@ -2481,8 +2626,15 @@ def list_jobs(status: str | None = None):
                 "frequency": job.frequency,
                 "next_run_at": job.next_run_at.isoformat() if job.next_run_at else None,
                 "created_at": job.created_at.isoformat() if job.created_at else None,
+                "completed_at": job.completed_at.isoformat() if job.completed_at else None,
                 "scraper_type": job.scraper_type,
                 "is_active": job.is_active,
+                "error": job.error,
+                "duration_seconds": job.duration_seconds,
+                "estimated_cost_usd": job.estimated_cost_usd,
+                "layer2_mode": job.layer2_mode,
+                "origin_verified": job.origin_verified,
+                "screenshot_path": job.screenshot_path,
             }
             for job in jobs
         ]
@@ -2609,6 +2761,133 @@ def get_scheduler_status():
                     {"name": "monthly", "interval": "30 days"},
                 ],
             },
+        }
+
+
+@app.put(
+    "/api/scheduled-jobs/{job_id}/pause",
+    tags=["jobs"],
+    summary="Pause a scheduled job",
+    description="Pause a recurring job. It will not run until resumed.",
+)
+def pause_scheduled_job(job_id: int):
+    """Pause a scheduled job."""
+    with Session(engine) as session:
+        job = session.get(ScrapeJob, job_id)
+        if not job:
+            raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+        if not job.frequency:
+            raise HTTPException(status_code=400, detail="This is not a recurring job")
+        
+        job.is_active = False
+        session.add(job)
+        session.commit()
+        
+        return {
+            "id": job_id,
+            "query": job.query[:50],
+            "status": "paused",
+            "message": "Job paused successfully. It will not run until resumed.",
+        }
+
+
+@app.put(
+    "/api/scheduled-jobs/{job_id}/resume",
+    tags=["jobs"],
+    summary="Resume a paused job",
+    description="Resume a paused recurring job.",
+)
+def resume_scheduled_job(job_id: int):
+    """Resume a paused scheduled job."""
+    with Session(engine) as session:
+        job = session.get(ScrapeJob, job_id)
+        if not job:
+            raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+        if not job.frequency:
+            raise HTTPException(status_code=400, detail="This is not a recurring job")
+        
+        job.is_active = True
+        # If next_run_at is in the past, update to now
+        if job.next_run_at and job.next_run_at < datetime.utcnow():
+            job.next_run_at = datetime.utcnow()
+        
+        session.add(job)
+        session.commit()
+        
+        return {
+            "id": job_id,
+            "query": job.query[:50],
+            "status": "active",
+            "next_run_at": job.next_run_at.isoformat() if job.next_run_at else None,
+            "message": "Job resumed successfully.",
+        }
+
+
+@app.delete(
+    "/api/scheduled-jobs/{job_id}",
+    tags=["jobs"],
+    summary="Delete a scheduled job",
+    description="Delete a recurring job. This will stop all future runs.",
+)
+def delete_scheduled_job(job_id: int):
+    """Delete a scheduled job."""
+    with Session(engine) as session:
+        job = session.get(ScrapeJob, job_id)
+        if not job:
+            raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+        
+        query_preview = job.query[:50]
+        session.delete(job)
+        session.commit()
+        
+        return {
+            "id": job_id,
+            "query": query_preview,
+            "message": "Scheduled job deleted successfully.",
+        }
+
+
+@app.get(
+    "/api/scheduled-jobs/{job_id}",
+    tags=["jobs"],
+    summary="Get scheduled job details",
+    description="Get details of a specific scheduled job.",
+)
+def get_scheduled_job(job_id: int):
+    """Get scheduled job details."""
+    with Session(engine) as session:
+        job = session.get(ScrapeJob, job_id)
+        if not job:
+            raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+        
+        # Get child jobs (executions)
+        child_jobs = session.exec(
+            select(ScrapeJob).where(ScrapeJob.parent_job_id == job_id).order_by(ScrapeJob.created_at.desc()).limit(10)
+        ).all()
+        
+        return {
+            "id": job.id,
+            "query": job.query,
+            "country": job.country,
+            "scraper_type": job.scraper_type,
+            "status": job.status,
+            "is_active": job.is_active,
+            "frequency": job.frequency,
+            "next_run_at": job.next_run_at.isoformat() if job.next_run_at else None,
+            "created_at": job.created_at.isoformat(),
+            "layer2_mode": job.layer2_mode,
+            "recent_executions": [
+                {
+                    "id": c.id,
+                    "status": c.status,
+                    "created_at": c.created_at.isoformat(),
+                    "completed_at": c.completed_at.isoformat() if c.completed_at else None,
+                    "duration_seconds": c.duration_seconds,
+                    "origin_ip": c.origin_ip,
+                    "origin_verified": c.origin_verified,
+                }
+                for c in child_jobs
+            ],
         }
 
 
@@ -3171,6 +3450,160 @@ def list_templates(active_only: bool = True):
         }
 
 
+@app.get(
+    "/api/templates/{template_id}",
+    tags=["scheduling"],
+    summary="Get template by ID",
+    description="Get a single template by its ID with full details.",
+)
+def get_template(template_id: int):
+    """Get a template by ID."""
+    with Session(engine) as session:
+        template = session.get(PromptTemplate, template_id)
+        if not template:
+            raise HTTPException(status_code=404, detail=f"Template {template_id} not found")
+        
+        countries = template.countries.split(",")
+        frequency_runs = {
+            "hourly": 24, "2_per_day": 2, "1_per_day": 1, "daily": 1,
+            "2_per_week": 0.29, "weekly": 0.14, "monthly": 0.03
+        }
+        layer_costs = {"direct": 0, "residential": 0.004, "unlocker": 0.008, "browser": 0.025, "auto": 0.008}
+        
+        jobs_per_run = len(countries)
+        daily_jobs = jobs_per_run * frequency_runs.get(template.frequency, 1)
+        
+        layer2 = template.preferred_layer2
+        if layer2 == "auto":
+            layer2 = {"google_ai": "unlocker", "chatgpt": "browser", "perplexity": "browser"}.get(template.scraper_type, "direct")
+        daily_cost = daily_jobs * layer_costs.get(layer2, 0)
+        
+        return {
+            "id": template.id,
+            "name": template.name,
+            "query": template.query,
+            "category": template.category,
+            "countries": countries,
+            "scraper_type": template.scraper_type,
+            "frequency": template.frequency,
+            "priority": template.priority,
+            "preferred_layer2": template.preferred_layer2,
+            "is_active": template.is_active,
+            "created_at": template.created_at.isoformat() if template.created_at else None,
+            "routing": {
+                "vpn_containers": [f"vpn-{c}" for c in countries],
+                "jobs_per_run": jobs_per_run,
+                "daily_jobs": round(daily_jobs, 1),
+                "daily_cost_usd": round(daily_cost, 3),
+            },
+        }
+
+
+class PromptTemplateUpdate(BaseModel):
+    """Request model for updating prompt templates"""
+    name: str = Field(default=None, description="Template name")
+    query: str = Field(default=None, description="The search query")
+    category: str = Field(default=None, description="Category")
+    countries: str = Field(default=None, description="Comma-separated country codes")
+    scraper_type: str = Field(default=None, description="Scraper type")
+    frequency: str = Field(default=None, description="Scheduling frequency")
+    priority: int = Field(default=None, description="Priority 1=high, 2=medium, 3=low")
+    preferred_layer2: str = Field(default=None, description="Preferred Layer 2 mode")
+    is_active: bool = Field(default=None, description="Whether template is active")
+
+
+@app.put(
+    "/api/templates/{template_id}",
+    tags=["scheduling"],
+    summary="Update template",
+    description="Update an existing template. Only provided fields will be updated.",
+)
+def update_template(template_id: int, update: PromptTemplateUpdate):
+    """Update a template."""
+    with Session(engine) as session:
+        template = session.get(PromptTemplate, template_id)
+        if not template:
+            raise HTTPException(status_code=404, detail=f"Template {template_id} not found")
+        
+        # Validate countries if provided
+        if update.countries:
+            requested_countries = [c.strip().lower() for c in update.countries.split(",")]
+            invalid_countries = [c for c in requested_countries if c not in SUPPORTED_VPN_COUNTRIES]
+            if invalid_countries:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid countries: {invalid_countries}. Supported: {SUPPORTED_VPN_COUNTRIES}"
+                )
+            template.countries = ",".join(requested_countries)
+        
+        # Validate scraper_type if provided
+        if update.scraper_type:
+            valid_scrapers = ["google_ai", "chatgpt", "perplexity"]
+            if update.scraper_type not in valid_scrapers:
+                raise HTTPException(status_code=400, detail=f"Invalid scraper_type. Supported: {valid_scrapers}")
+            template.scraper_type = update.scraper_type
+        
+        # Validate layer2 if provided
+        if update.preferred_layer2:
+            valid_layers = ["auto", "direct", "residential", "unlocker", "browser"]
+            if update.preferred_layer2 not in valid_layers:
+                raise HTTPException(status_code=400, detail=f"Invalid preferred_layer2. Supported: {valid_layers}")
+            template.preferred_layer2 = update.preferred_layer2
+        
+        # Validate frequency if provided
+        if update.frequency:
+            valid_frequencies = ["hourly", "2_per_day", "1_per_day", "daily", "2_per_week", "weekly", "monthly"]
+            if update.frequency not in valid_frequencies:
+                raise HTTPException(status_code=400, detail=f"Invalid frequency. Supported: {valid_frequencies}")
+            template.frequency = update.frequency
+        
+        # Update other fields
+        if update.name is not None:
+            template.name = update.name
+        if update.query is not None:
+            template.query = update.query
+        if update.category is not None:
+            template.category = update.category
+        if update.priority is not None:
+            template.priority = update.priority
+        if update.is_active is not None:
+            template.is_active = update.is_active
+        
+        session.add(template)
+        session.commit()
+        session.refresh(template)
+        
+        return {
+            "id": template.id,
+            "name": template.name,
+            "message": "Template updated successfully",
+            "updated_fields": [k for k, v in update.dict().items() if v is not None],
+        }
+
+
+@app.delete(
+    "/api/templates/{template_id}",
+    tags=["scheduling"],
+    summary="Delete template",
+    description="Delete a template. This will NOT delete any scheduled jobs created from this template.",
+)
+def delete_template(template_id: int):
+    """Delete a template."""
+    with Session(engine) as session:
+        template = session.get(PromptTemplate, template_id)
+        if not template:
+            raise HTTPException(status_code=404, detail=f"Template {template_id} not found")
+        
+        template_name = template.name
+        session.delete(template)
+        session.commit()
+        
+        return {
+            "message": f"Template '{template_name}' (ID: {template_id}) deleted successfully",
+            "id": template_id,
+        }
+
+
 class BatchScheduleRequest(BaseModel):
     """Request model for batch scheduling"""
     template_ids: list[int] = Field(default=None, description="Template IDs to schedule (None = all active)")
@@ -3581,5 +4014,989 @@ def get_api_reference():
                     "with_browser": "$7.50/day, $225/month",
                 },
             },
+        },
+    }
+
+
+# ==============================================================================
+# DOCKER LOGS & ADMIN ENDPOINTS
+# ==============================================================================
+
+@app.get(
+    "/api/docker/logs/{container}",
+    tags=["system"],
+    summary="Get Docker container logs",
+    description="Fetch logs from a Docker container. Useful for debugging and monitoring.",
+)
+async def get_docker_logs(container: str, lines: int = 100, since: str = None):
+    """
+    Get logs from a Docker container.
+    
+    Args:
+        container: Container name (e.g., 'aiseo-scraper', 'vpn-it')
+        lines: Number of lines to return (default 100, max 1000)
+        since: Only return logs since this time (e.g., '10m', '1h')
+    
+    Returns:
+        Container logs as text
+    """
+    import subprocess
+    
+    # Validate container name to prevent command injection
+    allowed_containers = [
+        'aiseo-scraper', 'aiseo-api', 'aiseo-admin', 'aiseo-db-ui', 'aiseo-api-tester',
+        'vpn-it', 'vpn-fr', 'vpn-de', 'vpn-uk', 'vpn-es', 'vpn-nl', 'vpn-ch', 'vpn-se',
+        'vpn-manager',
+        'residential-proxy-it', 'residential-proxy-fr', 'residential-proxy-de',
+        'residential-proxy-uk', 'residential-proxy-es', 'residential-proxy-nl',
+        'residential-proxy-ch', 'residential-proxy-se',
+    ]
+    
+    if container not in allowed_containers:
+        raise HTTPException(status_code=400, detail=f"Invalid container. Allowed: {', '.join(allowed_containers)}")
+    
+    lines = min(lines, 1000)  # Cap at 1000 lines
+    
+    cmd = ["docker", "logs", container, f"--tail={lines}"]
+    if since:
+        cmd.extend(["--since", since])
+    
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+        logs = result.stdout + result.stderr
+        
+        return {
+            "container": container,
+            "lines_requested": lines,
+            "logs": logs,
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+    except subprocess.TimeoutExpired:
+        raise HTTPException(status_code=504, detail="Timeout fetching logs")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get(
+    "/api/docker/containers",
+    tags=["system"],
+    summary="List Docker containers",
+    description="List all running Docker containers with their status.",
+)
+async def list_docker_containers():
+    """List all Docker containers with status."""
+    import subprocess
+    
+    try:
+        result = subprocess.run(
+            ["docker", "ps", "--format", "{{.Names}}\t{{.Status}}\t{{.Ports}}"],
+            capture_output=True, text=True, timeout=10
+        )
+        
+        containers = []
+        for line in result.stdout.strip().split('\n'):
+            if line:
+                parts = line.split('\t')
+                containers.append({
+                    "name": parts[0] if len(parts) > 0 else "",
+                    "status": parts[1] if len(parts) > 1 else "",
+                    "ports": parts[2] if len(parts) > 2 else "",
+                })
+        
+        return {"containers": containers, "count": len(containers)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==============================================================================
+# VPN MONITORING ENDPOINTS
+# ==============================================================================
+
+@app.get(
+    "/api/vpn/ip/{country}",
+    tags=["vpn"],
+    summary="Get VPN container IP",
+    description="Get the current public IP address of a VPN container.",
+)
+async def get_vpn_ip(country: str):
+    """Get the current public IP of a VPN container."""
+    import subprocess
+    
+    allowed_countries = ['it', 'fr', 'de', 'uk', 'es', 'nl', 'ch', 'se']
+    if country.lower() not in allowed_countries:
+        raise HTTPException(status_code=400, detail=f"Invalid country. Allowed: {', '.join(allowed_countries)}")
+    
+    container = f"vpn-{country.lower()}"
+    
+    try:
+        # Use api.ipify.org which returns plain IP (works with wget in Alpine)
+        result = subprocess.run(
+            ["docker", "exec", container, "wget", "-q", "-O", "-", "-T", "5", "http://api.ipify.org"],
+            capture_output=True, text=True, timeout=15
+        )
+        ip = result.stdout.strip()
+        
+        if not ip or result.returncode != 0:
+            # Try alternative service
+            result = subprocess.run(
+                ["docker", "exec", container, "wget", "-q", "-O", "-", "-T", "5", "http://icanhazip.com"],
+                capture_output=True, text=True, timeout=15
+            )
+            ip = result.stdout.strip()
+        
+        # Validate IP format (basic check for IPv4)
+        if ip and len(ip) <= 15 and ip.count('.') == 3:
+            return {
+                "container": container,
+                "country": country.lower(),
+                "ip": ip,
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+        else:
+            return {
+                "container": container,
+                "country": country.lower(),
+                "ip": "unavailable",
+                "raw_output": ip[:50] if ip else "empty",
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+    except subprocess.TimeoutExpired:
+        return {"container": container, "country": country.lower(), "ip": "timeout", "error": "Request timed out"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post(
+    "/api/vpn/rotate/{country}",
+    tags=["vpn"],
+    summary="Rotate VPN IP",
+    description="Trigger IP rotation for a VPN container by restarting it.",
+)
+async def rotate_vpn_ip(country: str):
+    """Rotate IP address for a VPN container."""
+    import subprocess
+    
+    allowed_countries = ['it', 'fr', 'de', 'uk', 'es', 'nl', 'ch', 'se']
+    if country.lower() not in allowed_countries:
+        raise HTTPException(status_code=400, detail=f"Invalid country. Allowed: {', '.join(allowed_countries)}")
+    
+    container = f"vpn-{country.lower()}"
+    
+    try:
+        # Restart the VPN container to get new IP
+        result = subprocess.run(
+            ["docker", "restart", container],
+            capture_output=True, text=True, timeout=30
+        )
+        
+        if result.returncode == 0:
+            return {
+                "container": container,
+                "status": "rotating",
+                "message": f"Container {container} is restarting for IP rotation",
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+        else:
+            raise HTTPException(status_code=500, detail=f"Failed to restart: {result.stderr}")
+    except subprocess.TimeoutExpired:
+        raise HTTPException(status_code=504, detail="Restart command timed out")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get(
+    "/api/vpn/status",
+    tags=["vpn"],
+    summary="Get all VPN status",
+    description="Get status of all VPN containers including health and uptime.",
+)
+async def get_all_vpn_status():
+    """Get status of all VPN containers."""
+    import subprocess
+    
+    countries = ['it', 'fr', 'de', 'uk', 'es', 'nl', 'ch', 'se']
+    vpn_status = []
+    
+    try:
+        # Get all container statuses
+        result = subprocess.run(
+            ["docker", "ps", "-a", "--filter", "name=vpn-", "--format", "{{.Names}}\t{{.Status}}\t{{.State}}"],
+            capture_output=True, text=True, timeout=10
+        )
+        
+        status_map = {}
+        for line in result.stdout.strip().split('\n'):
+            if line:
+                parts = line.split('\t')
+                name = parts[0] if len(parts) > 0 else ""
+                status_map[name] = {
+                    "status": parts[1] if len(parts) > 1 else "",
+                    "state": parts[2] if len(parts) > 2 else "",
+                }
+        
+        for country in countries:
+            container = f"vpn-{country}"
+            info = status_map.get(container, {})
+            
+            is_running = "Up" in info.get("status", "")
+            is_healthy = "healthy" in info.get("status", "")
+            
+            vpn_status.append({
+                "country": country,
+                "container": container,
+                "running": is_running,
+                "healthy": is_healthy,
+                "status": info.get("status", "not found"),
+            })
+        
+        healthy_count = sum(1 for v in vpn_status if v["healthy"])
+        running_count = sum(1 for v in vpn_status if v["running"])
+        
+        return {
+            "vpns": vpn_status,
+            "summary": {
+                "total": len(countries),
+                "running": running_count,
+                "healthy": healthy_count,
+            },
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==============================================================================
+# DATABASE STATISTICS ENDPOINT
+# ==============================================================================
+
+@app.get(
+    "/api/stats/database",
+    tags=["system"],
+    summary="Get database statistics",
+    description="Get comprehensive statistics about jobs, prompts, and sources in the database.",
+)
+async def get_database_stats():
+    """
+    Get database statistics for the admin dashboard.
+    
+    Returns counts, success rates, and recent activity.
+    """
+    from datetime import timedelta
+    
+    with Session(engine) as session:
+        now = datetime.utcnow()
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        yesterday_start = today_start - timedelta(days=1)
+        week_start = today_start - timedelta(days=7)
+        
+        # Total counts
+        total_jobs = session.exec(select(func.count(ScrapeJob.id))).one()
+        total_prompts = session.exec(select(func.count(Prompt.id))).one()
+        total_sources = session.exec(select(func.count(Source.id))).one()
+        total_templates = session.exec(select(func.count(PromptTemplate.id))).one()
+        total_brands = session.exec(select(func.count(Brand.id))).one()
+        
+        # Jobs by status
+        jobs_by_status = {}
+        for status in ["completed", "failed", "running", "pending", "scheduled"]:
+            count = session.exec(
+                select(func.count(ScrapeJob.id)).where(ScrapeJob.status == status)
+            ).one()
+            jobs_by_status[status] = count
+        
+        # Today's jobs
+        today_jobs = session.exec(
+            select(func.count(ScrapeJob.id)).where(ScrapeJob.created_at >= today_start)
+        ).one()
+        today_completed = session.exec(
+            select(func.count(ScrapeJob.id)).where(
+                ScrapeJob.created_at >= today_start,
+                ScrapeJob.status == "completed"
+            )
+        ).one()
+        today_failed = session.exec(
+            select(func.count(ScrapeJob.id)).where(
+                ScrapeJob.created_at >= today_start,
+                ScrapeJob.status == "failed"
+            )
+        ).one()
+        
+        # Week stats
+        week_jobs = session.exec(
+            select(func.count(ScrapeJob.id)).where(ScrapeJob.created_at >= week_start)
+        ).one()
+        week_completed = session.exec(
+            select(func.count(ScrapeJob.id)).where(
+                ScrapeJob.created_at >= week_start,
+                ScrapeJob.status == "completed"
+            )
+        ).one()
+        
+        # Average duration
+        avg_duration = session.exec(
+            select(func.avg(ScrapeJob.duration_seconds)).where(
+                ScrapeJob.duration_seconds != None,
+                ScrapeJob.status == "completed"
+            )
+        ).one() or 0
+        
+        # Total cost (estimated)
+        total_cost = session.exec(
+            select(func.sum(ScrapeJob.estimated_cost_usd)).where(
+                ScrapeJob.estimated_cost_usd != None
+            )
+        ).one() or 0
+        today_cost = session.exec(
+            select(func.sum(ScrapeJob.estimated_cost_usd)).where(
+                ScrapeJob.created_at >= today_start,
+                ScrapeJob.estimated_cost_usd != None
+            )
+        ).one() or 0
+        
+        # Jobs by country
+        jobs_by_country = {}
+        for country in ["it", "fr", "de", "uk", "es", "nl", "ch", "se"]:
+            count = session.exec(
+                select(func.count(ScrapeJob.id)).where(ScrapeJob.country == country)
+            ).one()
+            if count > 0:
+                jobs_by_country[country] = count
+        
+        # Jobs by scraper type
+        jobs_by_scraper = {}
+        for scraper in ["google_ai", "chatgpt", "perplexity"]:
+            count = session.exec(
+                select(func.count(ScrapeJob.id)).where(ScrapeJob.scraper_type == scraper)
+            ).one()
+            if count > 0:
+                jobs_by_scraper[scraper] = count
+        
+        # Recent failed jobs (last 5)
+        recent_failed = session.exec(
+            select(ScrapeJob).where(ScrapeJob.status == "failed")
+            .order_by(ScrapeJob.created_at.desc()).limit(5)
+        ).all()
+        
+        return {
+            "totals": {
+                "jobs": total_jobs,
+                "prompts": total_prompts,
+                "sources": total_sources,
+                "templates": total_templates,
+                "brands": total_brands,
+            },
+            "jobs_by_status": jobs_by_status,
+            "today": {
+                "total": today_jobs,
+                "completed": today_completed,
+                "failed": today_failed,
+                "success_rate": round(today_completed / today_jobs * 100, 1) if today_jobs > 0 else 100,
+                "cost_usd": round(today_cost, 4),
+            },
+            "week": {
+                "total": week_jobs,
+                "completed": week_completed,
+                "success_rate": round(week_completed / week_jobs * 100, 1) if week_jobs > 0 else 100,
+            },
+            "performance": {
+                "avg_duration_seconds": round(avg_duration, 2),
+                "total_cost_usd": round(total_cost, 4),
+            },
+            "jobs_by_country": jobs_by_country,
+            "jobs_by_scraper": jobs_by_scraper,
+            "recent_failures": [
+                {
+                    "id": j.id,
+                    "query": j.query[:50] if j.query else "",
+                    "error": j.error[:100] if j.error else "Unknown",
+                    "created_at": j.created_at.isoformat() if j.created_at else None,
+                }
+                for j in recent_failed
+            ],
+            "generated_at": now.isoformat(),
+        }
+
+
+# ==============================================================================
+# SCREENSHOTS & JOB DETAILS ENDPOINTS
+# ==============================================================================
+
+SCREENSHOTS_DIR = os.environ.get("SCREENSHOTS_DIR", "/app/data/screenshots")
+
+
+@app.get(
+    "/api/screenshots/{filename}",
+    tags=["system"],
+    summary="Get screenshot image",
+    description="Serve a screenshot file by filename.",
+)
+async def get_screenshot(filename: str):
+    """
+    Serve a screenshot image file.
+    
+    Args:
+        filename: Screenshot filename (e.g., 'job_123_error_20260201_123456.png')
+    
+    Returns:
+        PNG image file
+    """
+    from fastapi.responses import FileResponse
+    from pathlib import Path
+    
+    # Security: validate filename (no path traversal)
+    if ".." in filename or "/" in filename or "\\" in filename:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    
+    # Check multiple possible locations
+    possible_paths = [
+        Path(SCREENSHOTS_DIR) / filename,
+        Path("/app/data/screenshots") / filename,
+        Path("data/screenshots") / filename,
+    ]
+    
+    for filepath in possible_paths:
+        if filepath.exists() and filepath.is_file():
+            return FileResponse(
+                path=str(filepath),
+                media_type="image/png",
+                filename=filename,
+            )
+    
+    raise HTTPException(status_code=404, detail=f"Screenshot not found: {filename}")
+
+
+@app.get(
+    "/api/screenshots",
+    tags=["system"],
+    summary="List all screenshots",
+    description="List all available screenshots with metadata.",
+)
+async def list_screenshots(job_id: int = None, limit: int = 50):
+    """
+    List available screenshots.
+    
+    Args:
+        job_id: Filter by job ID (optional)
+        limit: Maximum number of results (default 50)
+    
+    Returns:
+        List of screenshot files with metadata
+    """
+    from pathlib import Path
+    import os
+    
+    screenshots = []
+    possible_dirs = [
+        Path(SCREENSHOTS_DIR),
+        Path("/app/data/screenshots"),
+        Path("data/screenshots"),
+    ]
+    
+    screenshots_dir = None
+    for d in possible_dirs:
+        if d.exists():
+            screenshots_dir = d
+            break
+    
+    if not screenshots_dir:
+        return {"screenshots": [], "count": 0, "directory": None}
+    
+    for f in sorted(screenshots_dir.glob("*.png"), key=lambda x: x.stat().st_mtime, reverse=True):
+        # Parse filename to extract job_id if present
+        name = f.stem
+        file_job_id = None
+        if name.startswith("job_"):
+            parts = name.split("_")
+            if len(parts) >= 2:
+                try:
+                    file_job_id = int(parts[1])
+                except:
+                    pass
+        
+        # Filter by job_id if specified
+        if job_id is not None and file_job_id != job_id:
+            continue
+        
+        stat = f.stat()
+        screenshots.append({
+            "filename": f.name,
+            "job_id": file_job_id,
+            "size_kb": round(stat.st_size / 1024, 2),
+            "created_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+            "url": f"/api/screenshots/{f.name}",
+        })
+        
+        if len(screenshots) >= limit:
+            break
+    
+    return {
+        "screenshots": screenshots,
+        "count": len(screenshots),
+        "directory": str(screenshots_dir),
+    }
+
+
+@app.get(
+    "/api/jobs/{job_id}/details",
+    tags=["jobs"],
+    summary="Get detailed job information",
+    description="Get comprehensive job details including config, logs, screenshots, and error info.",
+)
+async def get_job_details(job_id: int):
+    """
+    Get detailed information about a job for debugging.
+    
+    Returns:
+        - Basic job info (status, query, country, etc.)
+        - Configuration snapshot (parsed JSON)
+        - Profile data (parsed JSON)
+        - Error message and traceback
+        - Screenshot URL (if available)
+        - HTML snapshot size
+        - Network chain info
+        - Cost and duration
+    """
+    with Session(engine) as session:
+        job = session.get(ScrapeJob, job_id)
+        if not job:
+            raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+        
+        # Parse JSON fields
+        config = {}
+        profile = {}
+        try:
+            if job.config_snapshot:
+                config = json.loads(job.config_snapshot)
+        except:
+            pass
+        try:
+            if job.profile_data:
+                profile = json.loads(job.profile_data)
+        except:
+            pass
+        
+        # Find screenshots for this job
+        screenshots = []
+        from pathlib import Path
+        for d in [Path(SCREENSHOTS_DIR), Path("/app/data/screenshots"), Path("data/screenshots")]:
+            if d.exists():
+                for f in d.glob(f"job_{job_id}_*.png"):
+                    screenshots.append({
+                        "filename": f.name,
+                        "url": f"/api/screenshots/{f.name}",
+                        "size_kb": round(f.stat().st_size / 1024, 2),
+                    })
+                # Also check for error screenshots without job_id prefix
+                for f in d.glob(f"*error*{job_id}*.png"):
+                    if f.name not in [s["filename"] for s in screenshots]:
+                        screenshots.append({
+                            "filename": f.name,
+                            "url": f"/api/screenshots/{f.name}",
+                            "size_kb": round(f.stat().st_size / 1024, 2),
+                        })
+                break
+        
+        return {
+            "id": job.id,
+            "status": job.status,
+            "query": job.query,
+            "country": job.country,
+            "scraper_type": config.get("scraper_type", "unknown"),
+            "created_at": job.created_at.isoformat() if job.created_at else None,
+            "completed_at": job.completed_at.isoformat() if job.completed_at else None,
+            "duration_seconds": job.duration_seconds,
+            
+            "error": {
+                "message": job.error,
+                "has_error": bool(job.error),
+            } if job.error else None,
+            
+            "network": {
+                "layer2_mode": job.layer2_mode,
+                "proxy_used": job.proxy_used,
+                "origin_ip": job.origin_ip,
+                "origin_country": job.origin_country,
+                "origin_verified": job.origin_verified,
+            },
+            
+            "cost": {
+                "estimated_usd": job.estimated_cost_usd,
+                "response_size_kb": job.response_size_kb,
+            },
+            
+            "config": config,
+            "profile": profile,
+            
+            "screenshots": screenshots,
+            "screenshot_count": len(screenshots),
+            
+            "html_snapshot": {
+                "available": bool(job.html_snapshot),
+                "size_kb": round(len(job.html_snapshot) / 1024, 2) if job.html_snapshot else 0,
+                "url": f"/api/jobs/{job_id}/html" if job.html_snapshot else None,
+            },
+            
+            "links": {
+                "sqladmin": f"/admin/scrape-job/details/{job_id}",
+                "html_snapshot": f"/api/jobs/{job_id}/html" if job.html_snapshot else None,
+                "screenshots": screenshots,
+            },
+        }
+
+
+@app.get(
+    "/api/jobs/{job_id}/html",
+    tags=["jobs"],
+    summary="Get job HTML snapshot",
+    description="Get the raw HTML content captured during the scrape.",
+)
+async def get_job_html(job_id: int):
+    """Get the HTML snapshot from a job."""
+    from fastapi.responses import HTMLResponse
+    
+    with Session(engine) as session:
+        job = session.get(ScrapeJob, job_id)
+        if not job:
+            raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+        
+        if not job.html_snapshot:
+            raise HTTPException(status_code=404, detail="No HTML snapshot available for this job")
+        
+        return HTMLResponse(content=job.html_snapshot)
+
+
+@app.get(
+    "/api/admin/docs",
+    tags=["system"],
+    summary="Admin Dashboard Documentation",
+    description="Complete documentation for the admin dashboard interface.",
+)
+async def get_admin_documentation():
+    """
+    Returns comprehensive documentation for the admin dashboard.
+    """
+    return {
+        "version": "1.2.0",
+        "last_updated": "2026-02-01",
+        "dashboard_url": "http://localhost:9091",
+        
+        "sections": {
+            "dashboard": {
+                "title": "Dashboard",
+                "description": "Real-time system overview with quick stats and actions",
+                "features": [
+                    "Active jobs count - Jobs currently running in background",
+                    "Today's jobs - Total jobs created today with completion count",
+                    "VPN status - Status of all 8 country VPN containers",
+                    "Cost estimate - Estimated Bright Data costs based on completed jobs",
+                    "Network chain visualization - Layer 1 → Layer 2 → Layer 3 flow",
+                    "Quick scrape form - Create one-time scrape jobs instantly",
+                    "Recent jobs list - Last 8 jobs with status indicators",
+                ],
+                "keyboard_shortcuts": {
+                    "R": "Refresh dashboard data",
+                },
+                "auto_refresh": "Every 5 seconds (configurable in Settings)",
+            },
+            
+            "jobs_manager": {
+                "title": "Jobs Manager",
+                "description": "Create, monitor, and manage all scraping jobs",
+                "features": [
+                    "Filter by status: All, Running, Scheduled, Completed, Failed",
+                    "Search jobs by query text",
+                    "View job details in SQLAdmin",
+                    "View HTML snapshots for completed jobs",
+                    "Create new jobs with full configuration",
+                ],
+                "api_endpoints": {
+                    "GET /api/jobs": "List all jobs (optional ?status= filter)",
+                    "GET /api/jobs/{id}": "Get job details including metadata",
+                    "GET /api/jobs/{id}/html": "Get raw HTML snapshot",
+                    "POST /api/jobs/scrape": "Create new scrape job",
+                },
+                "code_reference": "backend/main.py:2328-2500",
+            },
+            
+            "layer1_vpn": {
+                "title": "Layer 1: VPN Network",
+                "description": "ProtonVPN connections via Gluetun containers providing datacenter IPs",
+                "countries": {
+                    "it": {"name": "Italy", "container": "vpn-it", "proxy_port": 8888, "control_port": 9004},
+                    "fr": {"name": "France", "container": "vpn-fr", "proxy_port": 8888, "control_port": 9001},
+                    "de": {"name": "Germany", "container": "vpn-de", "proxy_port": 8888, "control_port": 9002},
+                    "uk": {"name": "United Kingdom", "container": "vpn-uk", "proxy_port": 8888, "control_port": 9007},
+                    "es": {"name": "Spain", "container": "vpn-es", "proxy_port": 8888, "control_port": 9005},
+                    "nl": {"name": "Netherlands", "container": "vpn-nl", "proxy_port": 8888, "control_port": 9003},
+                    "ch": {"name": "Switzerland", "container": "vpn-ch", "proxy_port": 8888, "control_port": 9008},
+                    "se": {"name": "Sweden", "container": "vpn-se", "proxy_port": 8888, "control_port": 9006},
+                },
+                "features": [
+                    "Auto IP rotation every 10 minutes via vpn-manager",
+                    "Health check monitoring",
+                    "Manual IP rotation via control server",
+                    "View container logs",
+                ],
+                "useful_commands": {
+                    "check_ip": "docker exec vpn-it curl -s ifconfig.me",
+                    "restart_vpn": "docker restart vpn-it",
+                    "view_logs": "docker logs vpn-it --tail=50",
+                    "rotate_ip": "curl http://localhost:9004/v1/openvpn/portforwarded",
+                },
+                "code_reference": "docker-compose.yml:46-200",
+            },
+            
+            "layer2_proxy": {
+                "title": "Layer 2: Bright Data Proxy",
+                "description": "Residential proxies and Scraping Browser for anti-detection",
+                "services": {
+                    "residential_proxy": {
+                        "description": "Real residential IPs from ISPs worldwide",
+                        "zone": "aiseo_1",
+                        "host": "brd.superproxy.io",
+                        "port": 33335,
+                        "cost": "$8.40/GB",
+                        "use_case": "Perplexity, rate-limited sites, stealth scraping",
+                        "auth_format": "brd-customer-{customer_id}-zone-{zone}-country-{country}:{password}",
+                    },
+                    "scraping_browser": {
+                        "description": "Cloud browser with CAPTCHA solving and fingerprint management",
+                        "zone": "scraping_browser1",
+                        "endpoint": "wss://brd.superproxy.io:9222",
+                        "cost": "$0.01 base + $0.02 per CAPTCHA",
+                        "use_case": "Google AI Mode, ChatGPT, JavaScript-heavy sites",
+                        "features": [
+                            "Automatic CAPTCHA solving",
+                            "Browser fingerprint management",
+                            "Proxy rotation",
+                            "Session recovery",
+                            "Anti-bot bypass",
+                        ],
+                    },
+                },
+                "geo_targeting": {
+                    "format": "-country-{code}",
+                    "example": "wss://brd-customer-hl_0d78e46f-zone-scraping_browser1-country-it:password@brd.superproxy.io:9222",
+                },
+                "code_reference": "config/scraper_defaults.json:191-231",
+            },
+            
+            "layer3_profiles": {
+                "title": "Layer 3: Device Profiles",
+                "description": "Viewport, user agent, and device emulation configurations",
+                "profile_types": {
+                    "phones": {
+                        "iphone_14": {
+                            "width": 390, "height": 844, "scale": 3,
+                            "user_agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15",
+                            "is_mobile": True, "has_touch": True,
+                        },
+                        "iphone_15_pro": {
+                            "width": 393, "height": 852, "scale": 3,
+                            "user_agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15",
+                            "is_mobile": True, "has_touch": True,
+                        },
+                        "pixel_7": {
+                            "width": 412, "height": 915, "scale": 2.625,
+                            "user_agent": "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36",
+                            "is_mobile": True, "has_touch": True,
+                        },
+                        "samsung_s23": {
+                            "width": 360, "height": 780, "scale": 3,
+                            "user_agent": "Mozilla/5.0 (Linux; Android 13; SM-S911B) AppleWebKit/537.36",
+                            "is_mobile": True, "has_touch": True,
+                        },
+                    },
+                    "tablets": {
+                        "ipad_pro_12": {
+                            "width": 1024, "height": 1366, "scale": 2,
+                            "user_agent": "Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X) AppleWebKit/605.1.15",
+                            "is_mobile": True, "has_touch": True,
+                        },
+                        "ipad_air": {
+                            "width": 820, "height": 1180, "scale": 2,
+                            "user_agent": "Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X) AppleWebKit/605.1.15",
+                            "is_mobile": True, "has_touch": True,
+                        },
+                        "galaxy_tab_s8": {
+                            "width": 800, "height": 1280, "scale": 2,
+                            "user_agent": "Mozilla/5.0 (Linux; Android 13; SM-X700) AppleWebKit/537.36",
+                            "is_mobile": True, "has_touch": True,
+                        },
+                    },
+                    "desktops": {
+                        "desktop_1080p": {
+                            "width": 1920, "height": 1080, "scale": 1,
+                            "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0",
+                            "is_mobile": False, "has_touch": False,
+                        },
+                        "desktop_1440p": {
+                            "width": 2560, "height": 1440, "scale": 1,
+                            "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0",
+                            "is_mobile": False, "has_touch": False,
+                        },
+                        "macbook_pro_14": {
+                            "width": 1512, "height": 982, "scale": 2,
+                            "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/605.1.15 Safari/604.1",
+                            "is_mobile": False, "has_touch": False,
+                        },
+                        "macbook_air_13": {
+                            "width": 1470, "height": 956, "scale": 2,
+                            "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/605.1.15 Safari/604.1",
+                            "is_mobile": False, "has_touch": False,
+                        },
+                        "linux_desktop": {
+                            "width": 1920, "height": 1080, "scale": 1,
+                            "user_agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120.0.0.0",
+                            "is_mobile": False, "has_touch": False,
+                        },
+                    },
+                },
+                "code_reference": "config/scraper_defaults.json:6-32",
+            },
+            
+            "scrapers": {
+                "title": "Scraper Configurations",
+                "description": "Available scraper types and their configurations",
+                "types": {
+                    "google_ai": {
+                        "name": "Google AI Mode",
+                        "status": "working",
+                        "description": "Google Search with AI Overviews (udm=50 parameter)",
+                        "layer2_mode": "scraping_browser",
+                        "features": [
+                            "Geolocation verification via IP check",
+                            "Auto CAPTCHA solving",
+                            "Full text extraction",
+                            "Source link extraction",
+                            "Cookie consent handling",
+                        ],
+                        "cost_per_request": "$0.015-0.035",
+                        "code_file": "src/scrapers/brightdata_browser_scraper.py",
+                    },
+                    "chatgpt": {
+                        "name": "ChatGPT",
+                        "status": "working",
+                        "description": "Direct ChatGPT scraping via chatgpt.com",
+                        "layer2_mode": "scraping_browser",
+                        "features": [
+                            "Login popup auto-dismiss",
+                            "CAPTCHA solving",
+                            "Response extraction",
+                        ],
+                        "cost_per_request": "$0.02-0.04",
+                        "code_file": "src/scrapers/chatgpt_scraper.py",
+                    },
+                    "perplexity": {
+                        "name": "Perplexity AI",
+                        "status": "working",
+                        "description": "Perplexity AI search via perplexity.ai",
+                        "layer2_mode": "residential",
+                        "vpn_required": True,
+                        "features": [
+                            "Stealth mode",
+                            "VPN + Residential proxy chain",
+                            "Response extraction from .prose elements",
+                        ],
+                        "cost_per_request": "~$0.01-0.05 (bandwidth based)",
+                        "code_file": "src/scrapers/perplexity_scraper.py",
+                    },
+                },
+            },
+            
+            "templates": {
+                "title": "Prompt Templates",
+                "description": "Reusable templates for batch scheduling",
+                "fields": {
+                    "name": "Template identifier",
+                    "query": "The search query to run",
+                    "countries": "Comma-separated country codes (e.g., 'it,ch,uk')",
+                    "scraper_type": "google_ai, chatgpt, or perplexity",
+                    "frequency": "1_per_day, 2_per_day, hourly, weekly, monthly",
+                    "is_active": "Whether template is enabled",
+                    "priority": "1=high, 2=medium, 3=low",
+                    "preferred_layer2": "auto, direct, residential, unlocker, browser",
+                },
+                "api_endpoints": {
+                    "GET /api/templates": "List all templates",
+                    "POST /api/templates": "Create new template",
+                    "PUT /api/templates/{id}": "Update template",
+                    "DELETE /api/templates/{id}": "Delete template",
+                },
+                "code_reference": "backend/models.py:143-159",
+            },
+            
+            "brands": {
+                "title": "Brand Management",
+                "description": "Track brand visibility and mentions in AI responses",
+                "fields": {
+                    "id": "Unique brand identifier (e.g., 'shopify')",
+                    "name": "Display name",
+                    "type": "'primary' or 'competitor'",
+                    "color": "Hex color for UI (e.g., '#06b6d4')",
+                    "variations": "Comma-separated search terms",
+                },
+                "api_endpoints": {
+                    "GET /api/brands": "List all brands with visibility metrics",
+                    "GET /api/brands/details": "Detailed brand analytics",
+                    "POST /api/brands": "Create new brand",
+                    "DELETE /api/brands/{id}": "Delete brand",
+                },
+                "code_reference": "backend/models.py:6-16",
+            },
+            
+            "docker_logs": {
+                "title": "Docker Logs",
+                "description": "Real-time container log viewer",
+                "available_containers": [
+                    "aiseo-scraper - Main scraper API service",
+                    "aiseo-api - FastAPI backend",
+                    "vpn-{country} - VPN containers (it, fr, de, uk, es, nl, ch, se)",
+                    "residential-proxy-{country} - GOST proxy sidecars",
+                ],
+                "api_endpoint": "GET /api/docker/logs/{container}?lines=100",
+                "parameters": {
+                    "container": "Container name",
+                    "lines": "Number of lines (default 100, max 1000)",
+                    "since": "Time filter (e.g., '10m', '1h')",
+                },
+            },
+            
+            "settings": {
+                "title": "Settings",
+                "description": "Dashboard configuration and system URLs",
+                "options": {
+                    "auto_refresh": "Enable/disable 5-second auto-refresh",
+                    "verbose_logs": "Show debug information in logs",
+                },
+                "service_urls": {
+                    "backend_api": "http://localhost:8000",
+                    "scraper_api": "http://localhost:5000",
+                    "sqladmin": "http://localhost:8000/admin",
+                    "api_docs": "http://localhost:8000/docs",
+                    "admin_dashboard": "http://localhost:9091",
+                },
+            },
+        },
+        
+        "tips": {
+            "quick_start": [
+                "1. Check Dashboard for system health",
+                "2. Use Quick Scrape for one-time jobs",
+                "3. Create Templates for recurring scrapes",
+                "4. Monitor Docker Logs for debugging",
+            ],
+            "debugging": [
+                "Check aiseo-scraper logs for scraping errors",
+                "Verify VPN status if geolocation fails",
+                "Use SQLAdmin to inspect job metadata",
+                "HTML snapshots show exactly what was scraped",
+            ],
+            "cost_optimization": [
+                "Use VPN Direct for testing (free)",
+                "Residential proxy for rate-limited sites",
+                "Scraping Browser for CAPTCHA-protected sites",
+                "Batch similar jobs to reduce overhead",
+            ],
         },
     }

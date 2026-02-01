@@ -1,0 +1,65 @@
+#cloud-config
+# Hetzner Cloud Init Script for AiSEO VPN Stack
+# Use this as "User data" when creating the server
+
+package_update: true
+package_upgrade: true
+
+packages:
+  - docker.io
+  - docker-compose
+  - git
+  - curl
+  - htop
+  - ufw
+
+runcmd:
+  # Enable Docker
+  - systemctl enable docker
+  - systemctl start docker
+  
+  # Add default user to docker group
+  - usermod -aG docker root
+  
+  # Configure firewall
+  - ufw default deny incoming
+  - ufw default allow outgoing
+  - ufw allow 22/tcp    # SSH
+  - ufw allow 5000/tcp  # Scraper API
+  - ufw allow 9090/tcp  # VPN Dashboard
+  - ufw --force enable
+  
+  # Create app directory
+  - mkdir -p /opt/aiseo
+  - cd /opt/aiseo
+  
+  # Clone or copy your repo (we'll use the docker-compose directly)
+  - echo "Server ready for deployment. Run: docker-compose up -d"
+
+write_files:
+  - path: /opt/aiseo/.env.example
+    content: |
+      # ProtonVPN WireGuard Keys (generate from https://account.protonvpn.com/downloads#wireguard-configuration)
+      PROTONVPN_KEY_FR=your_france_key
+      PROTONVPN_KEY_DE=your_germany_key
+      PROTONVPN_KEY_NL=your_netherlands_key
+      PROTONVPN_KEY_IT=your_italy_key
+      PROTONVPN_KEY_ES=your_spain_key
+      PROTONVPN_KEY_UK=your_uk_key
+      PROTONVPN_KEY_CH=your_switzerland_key
+      PROTONVPN_KEY_SE=your_sweden_key
+      
+      # Bright Data Residential Proxy (optional)
+      BRIGHT_DATA_USER=your_user
+      BRIGHT_DATA_PASSWORD=your_password
+      BRIGHT_DATA_HOST=brd.superproxy.io
+      BRIGHT_DATA_PORT=22225
+      
+      # Bright Data Scraping Browser (optional)
+      BRIGHTDATA_API_TOKEN=your_token
+      BRIGHTDATA_CUSTOMER_ID=hl_xxxxx
+      BRIGHTDATA_BROWSER_ZONE=scraping_browser1
+      BRIGHTDATA_BROWSER_PASSWORD=your_password
+    permissions: '0600'
+
+final_message: "AiSEO VPN Server ready! Connect via SSH and deploy with docker-compose."

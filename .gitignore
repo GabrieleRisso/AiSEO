@@ -51,6 +51,10 @@ data/results/**/*.json
 data/screenshots/*.png
 data/sessions/
 
+# Debug files (temporary HTML snapshots)
+data/debug/*.html
+data/*_html_snapshot.html
+
 # Backend backups (keep structure, ignore large files)
 backend/backups/*.json
 backend/backups/*.backup
@@ -64,3 +68,6 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Postman (now in api-tester)
+# postman/ folder can be removed - files moved to api-tester/

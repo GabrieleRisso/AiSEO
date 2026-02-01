@@ -44,6 +44,63 @@
             font-size: 18px;
             font-weight: 600;
             color: #ffffff;
+            margin-bottom: 12px;
+        }
+
+        .postman-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .postman-btn {
+            padding: 8px 12px;
+            background: #ff6c37;
+            border: none;
+            border-radius: 4px;
+            color: #ffffff;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            text-align: center;
+            transition: background 0.2s;
+        }
+
+        .postman-btn:hover {
+            background: #e55a2b;
+        }
+
+        .postman-btn.secondary {
+            background: #4a90e2;
+        }
+
+        .postman-btn.secondary:hover {
+            background: #357abd;
+        }
+
+        .select-all-btn {
+            padding: 6px 12px;
+            background: #4a90e2;
+            border: none;
+            border-radius: 4px;
+            color: #ffffff;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 8px;
+            width: 100%;
+            transition: background 0.2s;
+        }
+
+        .select-all-btn:hover {
+            background: #357abd;
+        }
+
+        .endpoint-count {
+            font-size: 11px;
+            color: #858585;
+            margin-top: 4px;
         }
 
         .endpoint-group {
@@ -396,6 +453,12 @@
         <div class="sidebar">
             <div class="sidebar-header">
                 <h1>API Tester</h1>
+                <div class="postman-buttons">
+                    <a href="/postman/collection" class="postman-btn" download>📥 Download Postman Collection</a>
+                    <a href="/postman/environment" class="postman-btn secondary" download>📥 Download Environment</a>
+                </div>
+                <div class="endpoint-count" id="endpoint-count">Loading endpoints...</div>
+                <button class="select-all-btn" onclick="scrollToTop()">⬆️ Scroll to Top</button>
             </div>
             
             <div class="endpoint-group">
@@ -440,9 +503,17 @@
                     <span class="method-badge method-post">POST</span>
                     <span class="endpoint-path">/api/brands</span>
                 </div>
+                <div class="endpoint-item" data-endpoint='{"method":"DELETE","url":"http://localhost:8000/api/brands/wix"}'>
+                    <span class="method-badge method-delete">DELETE</span>
+                    <span class="endpoint-path">/api/brands/{id}</span>
+                </div>
                 <div class="endpoint-item" data-endpoint='{"method":"GET","url":"http://localhost:8000/api/prompts"}'>
                     <span class="method-badge method-get">GET</span>
                     <span class="endpoint-path">/api/prompts</span>
+                </div>
+                <div class="endpoint-item" data-endpoint='{"method":"GET","url":"http://localhost:8000/api/prompts/1"}'>
+                    <span class="method-badge method-get">GET</span>
+                    <span class="endpoint-path">/api/prompts/{id}</span>
                 </div>
                 <div class="endpoint-item" data-endpoint='{"method":"GET","url":"http://localhost:8000/api/sources"}'>
                     <span class="method-badge method-get">GET</span>
@@ -568,26 +639,51 @@
             });
         });
 
+        // Update endpoint count
+        function updateEndpointCount() {
+            const count = document.querySelectorAll('.endpoint-item').length;
+            document.getElementById('endpoint-count').textContent = `${count} endpoints available`;
+        }
+
+        // Scroll to top function
+        function scrollToTop() {
+            document.querySelector('.sidebar').scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
         // Endpoint selection
         document.querySelectorAll('.endpoint-item').forEach(item => {
             item.addEventListener('click', () => {
                 document.querySelectorAll('.endpoint-item').forEach(i => i.classList.remove('active'));
                 item.classList.add('active');
                 
-                const endpoint = JSON.parse(item.dataset.endpoint);
-                document.getElementById('method-select').value = endpoint.method;
-                document.getElementById('url-input').value = endpoint.url;
-                
-                if (endpoint.body) {
-                    document.getElementById('request-body').value = JSON.stringify(endpoint.body, null, 2);
-                } else {
-                    document.getElementById('request-body').value = '';
+                try {
+                    const endpoint = JSON.parse(item.dataset.endpoint);
+                    document.getElementById('method-select').value = endpoint.method;
+                    document.getElementById('url-input').value = endpoint.url;
+                    
+                    if (endpoint.body) {
+                        document.getElementById('request-body').value = JSON.stringify(endpoint.body, null, 2);
+                    } else {
+                        document.getElementById('request-body').value = '';
+                    }
+                    
+                    // Clear query params
+                    document.getElementById('query-params').innerHTML = '';
+                    
+                    // Switch to request tab
+                    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+                    document.querySelector('[data-tab="request"]').classList.add('active');
+                    document.getElementById('request-tab').classList.add('active');
+                } catch (e) {
+                    console.error('Error parsing endpoint:', e);
+                    alert('Error loading endpoint configuration');
                 }
-                
-                // Clear query params
-                document.getElementById('query-params').innerHTML = '';
             });
         });
+
+        // Initialize endpoint count
+        updateEndpointCount();
 
         // Add query parameter
         function addQueryParam() {
@@ -635,13 +731,24 @@
                 }
             };
 
-            if (['POST', 'PUT', 'PATCH'].includes(method) && requestBody.trim()) {
-                try {
-                    options.body = JSON.stringify(JSON.parse(requestBody));
-                } catch (e) {
-                    alert('Invalid JSON in request body');
-                    return;
+            // Handle request body
+            if (['POST', 'PUT', 'PATCH'].includes(method)) {
+                if (requestBody.trim()) {
+                    try {
+                        // Parse and re-stringify to validate JSON
+                        const parsed = JSON.parse(requestBody);
+                        options.body = JSON.stringify(parsed);
+                    } catch (e) {
+                        alert(`Invalid JSON in request body:\n${e.message}`);
+                        return;
+                    }
+                } else {
+                    // Some APIs require empty body, don't set Content-Type if body is empty
+                    delete options.headers['Content-Type'];
                 }
+            } else {
+                // GET, DELETE don't need Content-Type header
+                delete options.headers['Content-Type'];
             }
 
             // Disable button
@@ -664,10 +771,26 @@
 
                 let responseData;
                 const contentType = response.headers.get('content-type');
-                if (contentType && contentType.includes('application/json')) {
-                    responseData = await response.json();
-                } else {
-                    responseData = await response.text();
+                
+                // Try to parse as JSON, fallback to text
+                try {
+                    const text = await response.text();
+                    if (text.trim()) {
+                        if (contentType && contentType.includes('application/json')) {
+                            responseData = JSON.parse(text);
+                        } else {
+                            // Try to parse anyway
+                            try {
+                                responseData = JSON.parse(text);
+                            } catch {
+                                responseData = text;
+                            }
+                        }
+                    } else {
+                        responseData = null;
+                    }
+                } catch (parseError) {
+                    responseData = `Failed to parse response: ${parseError.message}`;
                 }
 
                 // Update response UI
@@ -685,16 +808,26 @@
                 document.getElementById('response-time').textContent = `${duration}ms`;
                 
                 const responseJson = document.getElementById('response-json');
-                if (typeof responseData === 'string') {
+                if (responseData === null) {
+                    responseJson.textContent = '(empty response)';
+                } else if (typeof responseData === 'string') {
                     responseJson.textContent = responseData;
                 } else {
                     responseJson.textContent = JSON.stringify(responseData, null, 2);
                 }
             } catch (error) {
-                document.getElementById('status-badge').textContent = 'Error';
-                document.getElementById('status-badge').className = 'status-badge status-500';
+                // Better error handling
+                const statusBadge = document.getElementById('status-badge');
+                statusBadge.textContent = 'Error';
+                statusBadge.className = 'status-badge status-500';
                 document.getElementById('response-time').textContent = '-';
-                document.getElementById('response-json').textContent = `Error: ${error.message}`;
+                
+                let errorMessage = `Error: ${error.message}`;
+                if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+                    errorMessage = `Network Error: Unable to connect to ${url.split('/')[2]}\n\nPossible causes:\n- Service is not running\n- CORS issue\n- Network connectivity problem\n\nError: ${error.message}`;
+                }
+                
+                document.getElementById('response-json').textContent = errorMessage;
             } finally {
                 sendBtn.disabled = false;
                 sendBtn.textContent = 'Send';

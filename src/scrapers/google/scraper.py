@@ -20,6 +20,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
 from ...utils.logger import Log, C, ChainConnectivityChecker
+from ...utils.filename import sanitize_filename
 
 if TYPE_CHECKING:
     from src.lib.antidetect import AntiDetectLayer
@@ -54,12 +55,16 @@ class GoogleAIScraper:
 
     BASE_URL = "https://www.google.com/search"
 
-    def __init__(self, headless: bool = False, proxy: Optional[str] = None, antidetect: Optional['AntiDetectLayer'] = None):
+    def __init__(self, headless: bool = False, proxy: Optional[str] = None, antidetect: Optional['AntiDetectLayer'] = None, job_id: int = None):
         self.headless = headless
         self.proxy = proxy
         self.antidetect = antidetect
+        self.job_id = job_id
         self._driver = None
         self.chain = ChainConnectivityChecker()
+        # Set job ID for logging
+        if job_id:
+            Log.set_job(job_id)
 
     def __enter__(self):
         self._start_browser()
@@ -120,13 +125,17 @@ class GoogleAIScraper:
     def _screenshot(self, name: str = "debug"):
         """Take a screenshot."""
         try:
-            d = Path(__file__).parent.parent.parent / "data" / "screenshots"
+            # Use absolute path for Docker volume
+            d = Path("/app/data/screenshots")
             d.mkdir(parents=True, exist_ok=True)
-            p = d / f"{name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+            # Sanitize filename to remove spaces and special characters
+            sanitized_name = sanitize_filename(name)
+            p = d / f"{sanitized_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
             self._driver.save_screenshot(str(p))
-            Log.info(f"Screenshot: {p.name}")
+            Log.info(f"Screenshot: {p}")
             return str(p)
-        except:
+        except Exception as e:
+            Log.warn(f"Screenshot failed: {e}")
             return None
 
     def _handle_cookie_consent(self):
@@ -386,8 +395,7 @@ class GoogleAIScraper:
 
     async def scrape(self, query: str, take_screenshot: bool = False) -> ScrapeResult:
         """Scrape Google AI Mode for a query."""
-        print(f"\n{C.CYAN}{C.BOLD}Google AI Scrape{C.RST}")
-        Log.data("Query", query)
+        Log.step(f"Scrape query=\"{query}\"", "scrape")
         
         timestamp = datetime.now(timezone.utc).isoformat()
         html_content = ""
@@ -439,7 +447,8 @@ class GoogleAIScraper:
             self._wait_for_response()
 
             if take_screenshot:
-                self._screenshot(f"google_ai_{query[:20]}")
+                query_safe = sanitize_filename(query[:30])
+                self._screenshot(f"google_ai_{query_safe}")
 
             try:
                 html_content = self._driver.page_source
@@ -458,7 +467,8 @@ class GoogleAIScraper:
             sources = self._extract_sources()
 
             if take_screenshot:
-                self._screenshot(f"google_ai_final_{query[:20]}")
+                query_safe = sanitize_filename(query[:30])
+                self._screenshot(f"google_ai_final_{query_safe}")
 
             Log.result(True, f"Done - {len(sources)} sources")
 
@@ -476,14 +486,23 @@ class GoogleAIScraper:
         except Exception as e:
             Log.fail(f"Scrape failed: {e}")
             
-            if take_screenshot:
-                self._screenshot("google_ai_error")
+            # ALWAYS take screenshot on error for debugging
+            error_screenshot = None
+            if self._driver:
+                # Sanitize query for filename
+                query_safe = sanitize_filename(query[:30])
+                error_screenshot = self._screenshot(f"error_{query_safe}")
             
             if not html_content and self._driver:
                 try:
                     html_content = self._driver.page_source
                 except:
                     pass
+            
+            # Log more details for debugging
+            Log.warn(f"Error details: {str(e)}")
+            if error_screenshot:
+                Log.info(f"Error screenshot saved: {error_screenshot}")
                     
             return ScrapeResult(
                 query=query,

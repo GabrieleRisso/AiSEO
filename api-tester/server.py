@@ -77,6 +77,32 @@ async def health_check():
     return {"status": "ok"}
 
 
+@app.get("/postman/collection")
+async def get_postman_collection():
+    """Serve Postman collection file."""
+    collection_path = BASE_DIR / "AiSEO_API.postman_collection.json"
+    if collection_path.exists():
+        return FileResponse(
+            collection_path,
+            media_type="application/json",
+            filename="AiSEO_API.postman_collection.json"
+        )
+    raise HTTPException(status_code=404, detail="Postman collection not found")
+
+
+@app.get("/postman/environment")
+async def get_postman_environment():
+    """Serve Postman environment file."""
+    env_path = BASE_DIR / "Local.postman_environment.json"
+    if env_path.exists():
+        return FileResponse(
+            env_path,
+            media_type="application/json",
+            filename="Local.postman_environment.json"
+        )
+    raise HTTPException(status_code=404, detail="Postman environment not found")
+
+
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", "9000"))

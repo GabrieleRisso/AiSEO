@@ -1,6 +1,8 @@
 import os
+import re
 import logging
 from typing import Optional, Dict, Any
+from datetime import datetime, timezone
 from fastapi import FastAPI, HTTPException, BackgroundTasks, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
@@ -57,7 +59,26 @@ app = FastAPI(
             "name": "scraping",
             "description": "Web scraping execution endpoints",
         },
+        {
+            "name": "docker",
+            "description": "Docker container management endpoints",
+        },
     ],
+)
+
+# Add CORS middleware for admin dashboard access
+from fastapi.middleware.cors import CORSMiddleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "https://admin.tokenspender.com",
+        "https://app.tokenspender.com",
+        "http://localhost:9091",
+        "http://localhost:5173",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 def get_scraper_class(scraper_type: str):
@@ -142,6 +163,7 @@ class ScrapeRequest(BaseModel):
         description="Custom viewport dimensions (overrides profile). Format: {'width': int, 'height': int}",
         example={"width": 1920, "height": 1080}
     )
+    job_id: Optional[int] = Field(default=None, description="Job ID for logging correlation")
     scroll_full_page: bool = Field(
         default=True, 
         description="Scroll page to load all dynamic content for full text extraction",
@@ -338,104 +360,61 @@ def get_config():
         }
     }
 
-def log_network_chain(country: str, layer2_mode: str, profile: str) -> dict:
+def log_network_chain(country: str, layer2_mode: str, profile: str, job_id: int = None) -> dict:
     """
-    Log the full network chain for traceability.
-    
-    Two-Layer Architecture:
-    - Layer 1: VPN (always active)
-    - Layer 2: Enhancement mode (direct, residential, unlocker, browser)
-    
+    Log the network chain config in clean single-line format with job ID.
     Returns origin verification info.
     """
-    from src.utils.logger import Log, C
+    from datetime import datetime
     import requests
     
+    # Colors
+    G = "\033[92m"  # Green
+    Y = "\033[93m"  # Yellow
+    R = "\033[91m"  # Red
+    C = "\033[96m"  # Cyan
+    M = "\033[95m"  # Magenta
+    D = "\033[2m"   # Dim
+    B = "\033[1m"   # Bold
+    X = "\033[0m"   # Reset
+    
+    ts = datetime.now().strftime("%H:%M:%S")
+    jid = f"[{C}job:{job_id}{X}]" if job_id else ""
+    
     vpn_country = country.upper()
-    vpn_host = f"vpn-{country.lower()}"
     vpn_proxy = f"http://vpn-{country.lower()}:8888"
     
-    origin_info = {
-        "ip": None,
-        "city": None,
-        "country": None,
-        "verified": False,
-        "warning": None,
-    }
+    origin_info = {"ip": None, "city": None, "country": None, "verified": False, "warning": None}
     
-    print(f"\n{C.CYAN}{C.BOLD}═══════════════════════════════════════════════════════════════{C.RST}")
-    print(f"{C.CYAN}{C.BOLD}           TWO-LAYER PROXY CONFIGURATION                       {C.RST}")
-    print(f"{C.CYAN}{C.BOLD}═══════════════════════════════════════════════════════════════{C.RST}")
+    # Single line for config
+    layer2_short = {"direct": "VPN", "residential": "VPN+Res", "unlocker": "Unlocker", "browser": "Browser"}
+    print(f"{D}{ts}{X} {jid} {C}START{X} query={vpn_country} layer2={layer2_short.get(layer2_mode, layer2_mode)} profile={profile}")
     
-    # Layer 1: VPN (Always Active)
-    print(f"\n{C.YELLOW}[Layer 1: VPN - Always Active]{C.RST}")
-    print(f"  ├─ Provider:  ProtonVPN (via Gluetun)")
-    print(f"  ├─ Target:    {vpn_country}")
-    print(f"  ├─ Container: {vpn_host}")
-    print(f"  └─ HTTP Proxy: {vpn_proxy}")
-    
-    # Verify VPN IP (except for browser mode which verifies separately)
-    if layer2_mode != "browser":
+    # Verify VPN IP only for direct/residential modes
+    if layer2_mode not in ("browser", "unlocker"):
         try:
-            resp = requests.get(
-                "https://ipinfo.io/json",
-                proxies={"http": vpn_proxy, "https": vpn_proxy},
-                timeout=10
-            )
+            resp = requests.get("https://ipinfo.io/json", proxies={"http": vpn_proxy, "https": vpn_proxy}, timeout=10)
             if resp.status_code == 200:
                 geo = resp.json()
-                origin_info["ip"] = geo.get("ip", "Unknown")
-                origin_info["city"] = geo.get("city", "Unknown")
-                origin_info["country"] = geo.get("country", "Unknown")
+                origin_info["ip"] = geo.get("ip", "?")
+                origin_info["city"] = geo.get("city", "?")
+                origin_info["country"] = geo.get("country", "?")
                 
-                print(f"\n{C.GREEN}[VPN Origin Verified]{C.RST}")
-                print(f"  ├─ IP:       {origin_info['ip']}")
-                print(f"  ├─ Country:  {origin_info['country']}")
-                print(f"  └─ City:     {origin_info['city']}")
-                
-                # Check for Zurich (ProtonVPN HQ) - incorrect routing
-                city_lower = origin_info["city"].lower() if origin_info["city"] else ""
+                city_lower = (origin_info["city"] or "").lower()
                 is_zurich = any(z in city_lower for z in ["zurich", "zürich", "zuerich"])
                 
                 if is_zurich and vpn_country != "CH":
-                    origin_info["warning"] = f"⚠️ Origin is Zurich (ProtonVPN HQ) but target is {vpn_country}. VPN may not be routing correctly."
-                    print(f"\n  {C.RED}{origin_info['warning']}{C.RST}")
-                    print(f"  {C.RED}Check PROTONVPN_KEY_{vpn_country} in .env{C.RST}")
+                    origin_info["warning"] = f"Zurich IP - wrong route"
+                    print(f"{D}{ts}{X} {jid} {R}VPN-ERR{X} ip={origin_info['ip']} got=Zurich expected={vpn_country}")
                 elif origin_info["country"].upper() != vpn_country:
-                    origin_info["warning"] = f"⚠️ Origin country is {origin_info['country']} but expected {vpn_country}. VPN key may be incorrect."
-                    print(f"\n  {C.YELLOW}{origin_info['warning']}{C.RST}")
+                    origin_info["warning"] = f"Country mismatch"
+                    print(f"{D}{ts}{X} {jid} {Y}VPN-WARN{X} ip={origin_info['ip']} got={origin_info['country']} expected={vpn_country}")
                 else:
                     origin_info["verified"] = True
-                    print(f"  {C.GREEN}✓ Origin verified for {vpn_country}{C.RST}")
-                    
+                    print(f"{D}{ts}{X} {jid} {G}VPN-OK{X} ip={origin_info['ip']} country={origin_info['country']} city={origin_info['city']}")
         except Exception as e:
-            origin_info["warning"] = f"VPN IP verification failed: {e}"
-            print(f"  {C.YELLOW}⚠ {origin_info['warning']}{C.RST}")
-    
-    # Layer 2: Enhancement Mode
-    print(f"\n{C.YELLOW}[Layer 2: Enhancement Mode]{C.RST}")
-    
-    layer2_info = {
-        "direct": ("VPN Only (Datacenter)", "Free", f"Client → [{vpn_host}] → Target"),
-        "residential": ("Residential IP", "~$8.40/GB", f"Client → [{vpn_host}] → [Bright Data Residential] → Target"),
-        "unlocker": ("Web Unlocker API", "~$3-10/1000 req", f"Client → [Bright Data Unlocker] → Target"),
-        "browser": ("Cloud Browser", "~$0.01-0.03/req", f"Client → [Bright Data Browser ({vpn_country})] → Target"),
-    }
-    
-    mode_name, mode_cost, chain = layer2_info.get(layer2_mode, layer2_info["direct"])
-    
-    print(f"  ├─ Mode:      {layer2_mode}")
-    print(f"  ├─ Type:      {mode_name}")
-    print(f"  └─ Cost:      {mode_cost}")
-    
-    # Device Profile
-    print(f"\n{C.YELLOW}[Device Profile]{C.RST}")
-    print(f"  └─ Profile:   {profile}")
-    
-    # Network Path
-    print(f"\n{C.GREEN}[Network Path]{C.RST}")
-    print(f"  {chain}")
-    print(f"{C.CYAN}═══════════════════════════════════════════════════════════════{C.RST}\n")
+            origin_info["warning"] = str(e)[:50]
+            print(f"{D}{ts}{X} {jid} {Y}VPN-WARN{X} check failed: {str(e)[:40]}")
     
     return origin_info
 
@@ -470,7 +449,7 @@ def resolve_layer2_mode(request) -> str:
     
     # Auto-select based on scraper type
     scraper_modes = {
-        "google_ai": "unlocker",  # Google requires CAPTCHA bypass
+        "google_ai": "browser",   # Google AI Mode requires JS rendering + CAPTCHA bypass
         "chatgpt": "browser",      # ChatGPT requires browser automation
         "perplexity": "browser",   # Perplexity requires browser automation
     }
@@ -592,22 +571,19 @@ async def run_scrape(request: ScrapeRequest):
     """
     # Resolve Layer 2 mode
     layer2_mode = resolve_layer2_mode(request)
-    
-    logger.info(f"Scrape request: {request.query} [{request.country}] scraper={request.scraper_type} layer2={layer2_mode}")
+    job_id = request.job_id
     
     # Build proxy config
     from src.scrapers.common.base import ProxyLayerConfig
     proxy_config = ProxyLayerConfig(country=request.country, layer2_mode=layer2_mode)
     proxy_url = proxy_config.active_proxy
     
-    logger.info(f"Layer 1 (VPN): {proxy_config.vpn_proxy_url}")
-    logger.info(f"Layer 2 ({layer2_mode}): {proxy_url}")
-    
     # Log and verify origin
     origin_info = log_network_chain(
         country=request.country,
         layer2_mode=layer2_mode,
-        profile=request.profile
+        profile=request.profile,
+        job_id=job_id
     )
     
     # Update proxy config with origin info
@@ -641,8 +617,10 @@ async def run_scrape(request: ScrapeRequest):
         use_browser = (layer2_mode == "browser") and SCRAPING_BROWSER_AVAILABLE
         
         if use_browser:
-            logger.info(f"Using Bright Data Scraping Browser for {request.scraper_type}")
-            logger.info(f"Profile: {request.profile}, Viewport: {request.custom_viewport}, Scroll: {request.scroll_full_page}")
+            # Browser mode - pass job_id for log correlation
+            from src.utils.logger import Log
+            if job_id:
+                Log.set_job(job_id)
             
             result = await scrape_with_browser(
                 query=request.query,
@@ -652,6 +630,7 @@ async def run_scrape(request: ScrapeRequest):
                 profile=request.profile,
                 custom_viewport=request.custom_viewport,
                 scroll_full_page=request.scroll_full_page,
+                job_id=job_id,
             )
             
             # Build full request config for traceability
@@ -722,19 +701,158 @@ async def run_scrape(request: ScrapeRequest):
         elif layer2_mode == "browser" and not SCRAPING_BROWSER_AVAILABLE:
             logger.warning("Browser mode requested but playwright not available, falling back to direct")
         
+        # Check if unlocker mode is requested - use Bright Data Web Unlocker API
+        if layer2_mode == "unlocker":
+            from urllib.parse import quote_plus
+            from pathlib import Path
+            import aiohttp
+            
+            ts = datetime.now().strftime("%H:%M:%S")
+            jid = f"[job:{job_id}]" if job_id else ""
+            
+            encoded_query = quote_plus(request.query)
+            target_url = f"https://www.google.com/search?udm=50&q={encoded_query}"
+            
+            api_token = os.environ.get("BRIGHTDATA_API_TOKEN", "")
+            unlocker_zone = os.environ.get("BRIGHTDATA_UNLOCKER_ZONE", "web_unlocker1")
+            
+            if not api_token:
+                print(f"{ts} {jid} ERROR api_token not configured")
+                raise HTTPException(status_code=500, detail="BRIGHTDATA_API_TOKEN not configured")
+            
+            print(f"{ts} {jid} UNLOCKER calling api.brightdata.com zone={unlocker_zone}")
+            
+            try:
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(
+                        "https://api.brightdata.com/request",
+                        headers={"Authorization": f"Bearer {api_token}", "Content-Type": "application/json"},
+                        json={"zone": unlocker_zone, "url": target_url, "format": "raw", "country": request.country.lower()},
+                        timeout=aiohttp.ClientTimeout(total=120)
+                    ) as resp:
+                        html_content = await resp.text()
+                        html_len = len(html_content)
+                        
+                        print(f"{ts} {jid} UNLOCKER response status={resp.status} html_len={html_len}")
+                        
+                        # Save FULL HTML for debugging (not truncated)
+                        error_dir = Path("/app/data/debug")
+                        error_dir.mkdir(parents=True, exist_ok=True)
+                        html_file = error_dir / f"job_{job_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
+                        html_file.write_text(html_content)  # Save full HTML
+                        print(f"{ts} {jid} SAVED html={html_file} ({len(html_content):,} bytes)")
+                        
+                        # Check for errors
+                        is_captcha = "unusual traffic" in html_content.lower() or "captcha" in html_content.lower()
+                        is_blocked = "blocked" in html_content.lower() or "denied" in html_content.lower()
+                        
+                        if is_captcha or is_blocked:
+                            err_type = "CAPTCHA" if is_captcha else "BLOCKED"
+                            print(f"{ts} {jid} FAIL {err_type} detected in response")
+                            return {
+                                "status": "failed",
+                                "data": [],
+                                "response_text": "",
+                                "html_content": html_content[:50000],
+                                "error": f"Web Unlocker returned {err_type} page - see {html_file}",
+                                "debug_file": str(html_file),
+                                "metadata": {"source_count": 0, "method": "web_unlocker", "job_id": job_id}
+                            }
+                        
+                        # Better extraction for Google AI Mode HTML
+                        sources = []
+                        seen_urls = set()
+                        
+                        # Pattern 1: Links with href and text content (nested elements)
+                        for match in re.finditer(r'<a[^>]+href="(https?://[^"]+)"[^>]*>(.*?)</a>', html_content, re.DOTALL):
+                            url, inner = match.groups()
+                            if any(skip in url for skip in ['google.com', 'gstatic.com', 'accounts.google', 'youtube.com/redirect']):
+                                continue
+                            if url in seen_urls:
+                                continue
+                            # Extract text from inner HTML
+                            title = re.sub(r'<[^>]+>', ' ', inner).strip()
+                            title = ' '.join(title.split())  # Normalize whitespace
+                            if title and len(title) > 5 and len(title) < 200:
+                                seen_urls.add(url)
+                                sources.append({"url": url, "title": title})
+                        
+                        # Pattern 2: Extract text from data-attrid divs (AI responses)
+                        response_parts = []
+                        for match in re.finditer(r'<div[^>]*data-attrid[^>]*>(.*?)</div>', html_content, re.DOTALL):
+                            text = re.sub(r'<[^>]+>', ' ', match.group(1)).strip()
+                            text = ' '.join(text.split())
+                            if text and len(text) > 30:
+                                response_parts.append(text)
+                        
+                        # Pattern 3: Extract from spans with long text
+                        for match in re.finditer(r'<span[^>]*>([^<]{40,500})</span>', html_content):
+                            text = match.group(1).strip()
+                            if text and not any(skip in text.lower() for skip in ['sign in', 'privacy', 'terms', 'javascript', 'function']):
+                                response_parts.append(text)
+                        
+                        # Pattern 4: Look for list items with content
+                        for match in re.finditer(r'<li[^>]*>(.*?)</li>', html_content, re.DOTALL):
+                            text = re.sub(r'<[^>]+>', ' ', match.group(1)).strip()
+                            text = ' '.join(text.split())
+                            if text and len(text) > 20 and len(text) < 500:
+                                if not any(skip in text.lower() for skip in ['sign in', 'google', 'settings']):
+                                    response_parts.append(f"• {text}")
+                        
+                        response_text = "\n".join(response_parts[:50])
+                        
+                        success = bool(sources or response_text)
+                        status_str = "OK" if success else "EMPTY"
+                        print(f"{ts} {jid} {status_str} sources={len(sources)} text_len={len(response_text)}")
+                        
+                        return {
+                            "status": "success" if success else "failed",
+                            "data": sources[:20],
+                            "response_text": response_text[:5000],
+                            "html_content": html_content[:50000],
+                            "error": None if success else f"No content extracted - see {html_file}",
+                            "debug_file": str(html_file),
+                            "metadata": {
+                                "source_count": len(sources),
+                                "timestamp": datetime.now(timezone.utc).isoformat(),
+                                "method": "web_unlocker",
+                                "job_id": job_id,
+                                "proxy_layer": {"layer2_mode": "unlocker", "origin": origin_info},
+                            }
+                        }
+            except Exception as e:
+                print(f"{ts} {jid} ERROR unlocker exception: {str(e)[:80]}")
+                raise
+        
         ScraperClass = get_scraper_class(request.scraper_type)
         
-        # Pass proxy config to scraper
-        with ScraperClass(headless=request.headless, proxy=proxy_url, antidetect=antidetect, proxy_config=proxy_config) as scraper:
+        # Initialize scraper with job_id for logging
+        scraper_kwargs = {"headless": request.headless, "proxy": proxy_url, "antidetect": antidetect}
+        if job_id:
+            scraper_kwargs["job_id"] = job_id
+        
+        with ScraperClass(**scraper_kwargs) as scraper:
             result = await scraper.scrape(request.query, take_screenshot=request.take_screenshot)
             
             # Enrich/Normalize metadata
             result_dict = {}
             if not isinstance(result, dict):
                 # Handle dataclass result (legacy GoogleAIScraper)
+                # Sources may already be dicts or dataclass instances
+                sources = getattr(result, "sources", [])
+                sources_list = []
+                for s in sources:
+                    if isinstance(s, dict):
+                        sources_list.append(s)
+                    else:
+                        try:
+                            sources_list.append(asdict(s))
+                        except TypeError:
+                            sources_list.append({"raw": str(s)})
+                
                 result_dict = {
                     "status": "success" if getattr(result, "success", True) else "failed",
-                    "data": [asdict(d) for d in getattr(result, "sources", [])],
+                    "data": sources_list,
                     "response_text": getattr(result, "response_text", ""),
                     "html_content": getattr(result, "html_content", ""),
                     "error": getattr(result, "error", None),
@@ -1143,3 +1261,96 @@ async def health_check():
     Use this endpoint to verify the service is running before making scraping requests.
     """
     return {"status": "ok"}
+
+
+# ==================== DOCKER ENDPOINTS ====================
+# These endpoints provide Docker container management for the admin dashboard
+
+import subprocess
+
+@app.get(
+    "/api/docker/containers",
+    tags=["docker"],
+    summary="List Docker containers",
+    description="Get list of all Docker containers with their status.",
+)
+async def get_docker_containers():
+    """Get list of Docker containers."""
+    try:
+        result = subprocess.run(
+            ["docker", "ps", "-a", "--format", "{{.Names}}\t{{.Status}}\t{{.Image}}\t{{.Ports}}"],
+            capture_output=True, text=True, timeout=10
+        )
+        containers = []
+        for line in result.stdout.strip().split('\n'):
+            if line:
+                parts = line.split('\t')
+                if len(parts) >= 2:
+                    containers.append({
+                        "name": parts[0],
+                        "status": parts[1] if len(parts) > 1 else "unknown",
+                        "image": parts[2] if len(parts) > 2 else "",
+                        "ports": parts[3] if len(parts) > 3 else ""
+                    })
+        return {"containers": containers}
+    except subprocess.TimeoutExpired:
+        return {"error": "Timeout getting containers", "containers": []}
+    except FileNotFoundError:
+        return {"error": "Docker not available", "containers": []}
+    except Exception as e:
+        return {"error": str(e), "containers": []}
+
+
+@app.get(
+    "/api/docker/logs/{container_name}",
+    tags=["docker"],
+    summary="Get container logs",
+    description="Get logs from a specific Docker container.",
+)
+async def get_docker_logs(container_name: str, lines: int = 100):
+    """Get logs from a Docker container."""
+    try:
+        result = subprocess.run(
+            ["docker", "logs", "--tail", str(lines), container_name],
+            capture_output=True, text=True, timeout=30
+        )
+        log_lines = (result.stdout + result.stderr).strip().split('\n')
+        return {
+            "container": container_name,
+            "logs": log_lines,
+            "line_count": len(log_lines)
+        }
+    except subprocess.TimeoutExpired:
+        return {"error": "Timeout fetching logs", "logs": []}
+    except FileNotFoundError:
+        return {"error": "Docker not available", "logs": []}
+    except Exception as e:
+        return {"error": str(e), "logs": []}
+
+
+@app.post(
+    "/api/docker/restart/{container_name}",
+    tags=["docker"],
+    summary="Restart container",
+    description="Restart a specific Docker container.",
+)
+async def restart_docker_container(container_name: str):
+    """Restart a Docker container."""
+    # Only allow restarting VPN containers for safety
+    allowed_prefixes = ['vpn-', 'residential-proxy-', 'aiseo-scraper']
+    if not any(container_name.startswith(p) for p in allowed_prefixes):
+        raise HTTPException(status_code=403, detail="Not allowed to restart this container")
+    
+    try:
+        result = subprocess.run(
+            ["docker", "restart", container_name],
+            capture_output=True, text=True, timeout=60
+        )
+        if result.returncode == 0:
+            return {"status": "success", "message": f"Container {container_name} restarted"}
+        else:
+            return {"status": "error", "message": result.stderr}
+    except subprocess.TimeoutExpired:
+        return {"status": "error", "message": "Timeout restarting container"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}

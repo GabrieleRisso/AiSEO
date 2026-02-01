@@ -1,0 +1,58 @@
+#cloud-config
+# Oracle Cloud Init Script for AiSEO VPN Stack
+# Works with ARM (Ampere A1) instances - FREE TIER!
+
+package_update: true
+package_upgrade: true
+
+packages:
+  - docker.io
+  - docker-compose
+  - git
+  - curl
+  - htop
+  - iptables-persistent
+
+runcmd:
+  # Enable Docker
+  - systemctl enable docker
+  - systemctl start docker
+  
+  # Add ubuntu user to docker group
+  - usermod -aG docker ubuntu
+  
+  # Configure iptables (Oracle Cloud uses iptables, not ufw)
+  - iptables -I INPUT -p tcp --dport 22 -j ACCEPT
+  - iptables -I INPUT -p tcp --dport 5000 -j ACCEPT
+  - iptables -I INPUT -p tcp --dport 9090 -j ACCEPT
+  - iptables -I INPUT -p tcp --dport 8001:8008 -j ACCEPT
+  - iptables -I INPUT -p tcp --dport 8101:8108 -j ACCEPT
+  - iptables -I INPUT -p tcp --dport 9001:9008 -j ACCEPT
+  - netfilter-persistent save
+  
+  # Create app directory
+  - mkdir -p /opt/aiseo
+  - chown ubuntu:ubuntu /opt/aiseo
+
+write_files:
+  - path: /opt/aiseo/.env.example
+    content: |
+      # ProtonVPN WireGuard Keys
+      PROTONVPN_KEY_FR=your_france_key
+      PROTONVPN_KEY_DE=your_germany_key
+      PROTONVPN_KEY_NL=your_netherlands_key
+      PROTONVPN_KEY_IT=your_italy_key
+      PROTONVPN_KEY_ES=your_spain_key
+      PROTONVPN_KEY_UK=your_uk_key
+      PROTONVPN_KEY_CH=your_switzerland_key
+      PROTONVPN_KEY_SE=your_sweden_key
+      
+      # Bright Data (optional)
+      BRIGHT_DATA_USER=
+      BRIGHT_DATA_PASSWORD=
+      BRIGHT_DATA_HOST=brd.superproxy.io
+      BRIGHT_DATA_PORT=22225
+    permissions: '0600'
+    owner: ubuntu:ubuntu
+
+final_message: "Oracle Cloud AiSEO VPN Server ready!"

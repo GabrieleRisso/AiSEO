@@ -199,6 +199,8 @@ class ScrapeResult:
     cost_estimate: Optional[dict] = None
     profile_info: Optional[dict] = None
     extraction_stats: Optional[dict] = None
+    screenshot_path: Optional[str] = None  # Relative path to screenshot file
+    logs: Optional[list] = None  # List of log entries during scraping
 
 
 class BrightDataBrowserScraper:
@@ -228,6 +230,7 @@ class BrightDataBrowserScraper:
         profile: str = "desktop_1080p",  # Device profile name or type (phone/tablet/desktop)
         custom_viewport: dict = None,  # Custom viewport override {"width": int, "height": int}
         scroll_full_page: bool = True,  # Whether to scroll to extract all content
+        job_id: int = None,  # Job ID for screenshot naming and log correlation
     ):
         if not PLAYWRIGHT_AVAILABLE:
             raise ImportError("playwright is required. Install with: pip install playwright && playwright install")
@@ -240,6 +243,7 @@ class BrightDataBrowserScraper:
         self.country = country.lower()
         self.scraper_type = scraper_type
         self.scroll_full_page = scroll_full_page
+        self.job_id = job_id
         
         # Resolve profile configuration
         self.profile_name, self.profile_config = self._resolve_profile(profile, custom_viewport)
@@ -252,6 +256,9 @@ class BrightDataBrowserScraper:
         self._start_time: float = 0.0
         self._data_transferred_bytes: int = 0
         self._captcha_solved: bool = False
+        
+        # Log capture for job details
+        self._logs: list = []
     
     def _resolve_profile(self, profile: str, custom_viewport: dict = None) -> tuple[str, dict]:
         """Resolve profile configuration from name or type."""
@@ -305,7 +312,7 @@ class BrightDataBrowserScraper:
             use_cdp: If True, use CDP to make request (doesn't affect page state)
         """
         try:
-            Log.step("Verifying browser location", "geo")
+            Log.step("[GEO] verifying browser location")
             
             # Make a simple JavaScript fetch request with timeout
             result = await asyncio.wait_for(
@@ -336,20 +343,14 @@ class BrightDataBrowserScraper:
                 city = result.get("city", "Unknown")
                 region = result.get("region", "")
                 
-                print(f"\n{C.GREEN}[Browser Location Verified]{C.RST}")
-                print(f"  ├─ IP:       {ip}")
-                print(f"  ├─ Country:  {country}")
-                print(f"  ├─ City:     {city}")
-                print(f"  └─ Region:   {region}")
-                
                 # Check if country matches expected
                 expected = self.country.upper()
                 actual = country.upper() if country else "UNKNOWN"
                 
                 if expected != actual and actual != "UNKNOWN":
-                    Log.warn(f"Country mismatch: expected {expected}, got {actual}")
+                    Log.warn(f"[GEO] ip={ip} country={actual} city={city} MISMATCH expected={expected}")
                 else:
-                    Log.ok(f"Country match: {actual}")
+                    Log.ok(f"[GEO] ip={ip} country={actual} city={city}")
                 
                 return {
                     "ip": ip,
@@ -403,31 +404,16 @@ class BrightDataBrowserScraper:
         """Connect to Bright Data Scraping Browser with profile configuration."""
         self._start_time = time.time()
         
-        print(f"\n{C.YELLOW}[Bright Data Connection]{C.RST}")
-        print(f"  ├─ Service:  Scraping Browser (Cloud)")
-        print(f"  ├─ Zone:     {self.zone}")
-        print(f"  ├─ Customer: {self.customer_id}")
-        print(f"  ├─ Protocol: CDP over WebSocket")
-        print(f"  └─ Endpoint: wss://brd.superproxy.io:9222")
-        
-        print(f"\n{C.YELLOW}[Device Profile]{C.RST}")
-        print(f"  ├─ Name:       {self.profile_name}")
-        print(f"  ├─ Type:       {self.profile_config['type']}")
-        print(f"  ├─ Viewport:   {self.profile_config['viewport']['width']}x{self.profile_config['viewport']['height']}")
-        print(f"  ├─ Scale:      {self.profile_config.get('device_scale_factor', 1)}x")
-        print(f"  ├─ Is Mobile:  {self.profile_config.get('is_mobile', False)}")
-        print(f"  ├─ Has Touch:  {self.profile_config.get('has_touch', False)}")
-        print(f"  └─ User Agent: {self.profile_config['user_agent'][:60]}...")
+        Log.step(f"[CDP] connecting zone={self.zone} endpoint=wss://brd.superproxy.io:9222")
         
         self._playwright = await async_playwright().start()
         
         try:
-            Log.step("Connecting via CDP", "browser")
             self._browser = await self._playwright.chromium.connect_over_cdp(
                 self.endpoint,
                 timeout=60000
             )
-            Log.ok("Connected to Scraping Browser")
+            Log.ok(f"[CDP] connected profile={self.profile_name} viewport={self.profile_config['viewport']['width']}x{self.profile_config['viewport']['height']}")
             
             # Create new page with viewport configuration
             context = self._browser.contexts[0] if self._browser.contexts else await self._browser.new_context(
@@ -444,11 +430,6 @@ class BrightDataBrowserScraper:
             # Apply viewport to the page explicitly
             await self._page.set_viewport_size(self.profile_config["viewport"])
             
-            print(f"\n{C.GREEN}[Connection Established]{C.RST}")
-            print(f"  ├─ Country:  {self.country.upper()}")
-            print(f"  ├─ Mobile:   {self.profile_config.get('is_mobile', False)}")
-            print(f"  └─ Status:   Ready")
-            
         except Exception as e:
             Log.fail(f"Connection failed: {e}")
             raise
@@ -462,15 +443,50 @@ class BrightDataBrowserScraper:
         if self._playwright:
             await self._playwright.stop()
     
-    async def _screenshot(self, name: str = "debug") -> Optional[str]:
-        """Take a screenshot."""
+    async def _screenshot(self, name: str = "debug", job_id: int = None) -> Optional[str]:
+        """
+        Take a screenshot and save to centralized folder.
+        
+        Screenshots are saved to /app/data/screenshots/ (in Docker) or 
+        SCREENSHOTS_DIR env var location.
+        
+        Naming convention: job_{job_id}_{name}_{timestamp}.png
+        or: {name}_{timestamp}.png if no job_id
+        
+        Returns the relative path from the screenshots folder (for storage in DB).
+        """
         try:
-            d = Path(__file__).parent.parent.parent / "data" / "screenshots"
+            # Use centralized screenshot directory
+            # Priority: SCREENSHOTS_DIR env var > /app/data/screenshots > local data folder
+            screenshots_dir = os.environ.get("SCREENSHOTS_DIR")
+            if screenshots_dir:
+                d = Path(screenshots_dir)
+            else:
+                # Check if we're in Docker (/app) or local development
+                app_data = Path("/app/data/screenshots")
+                if app_data.parent.exists():
+                    d = app_data
+                else:
+                    d = Path(__file__).parent.parent.parent.parent / "data" / "screenshots"
+            
             d.mkdir(parents=True, exist_ok=True)
-            p = d / f"sbb_{name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
-            await self._page.screenshot(path=str(p))
-            Log.info(f"Screenshot: {p.name}")
-            return str(p)
+            
+            # Build filename with job_id for traceability
+            # Sanitize name to remove spaces and special characters
+            from ...utils.filename import sanitize_filename
+            sanitized_name = sanitize_filename(name)
+            ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+            if job_id:
+                filename = f"job_{job_id}_{sanitized_name}_{ts}.png"
+            else:
+                filename = f"{sanitized_name}_{ts}.png"
+            
+            p = d / filename
+            await self._page.screenshot(path=str(p), full_page=True)
+            Log.info(f"Screenshot: {filename}")
+            
+            # Return relative path for DB storage
+            return filename
         except Exception as e:
             Log.warn(f"Screenshot failed: {e}")
             return None
@@ -877,8 +893,7 @@ class BrightDataBrowserScraper:
                 ))
                 extraction_stats["links_extracted"] += 1
             
-            Log.ok(f"Extracted {len(sources)} sources, {len(response_parts)} content blocks")
-            Log.data("Stats", f"H:{extraction_stats['headings_found']} P:{extraction_stats['paragraphs_found']} L:{extraction_stats['list_items_found']} Links:{extraction_stats['links_extracted']}")
+            Log.ok(f"[EXTRACT] sources={len(sources)} blocks={len(response_parts)} headings={extraction_stats['headings_found']} paragraphs={extraction_stats['paragraphs_found']}")
             
         except Exception as e:
             Log.warn(f"Extraction error: {e}")
@@ -903,17 +918,14 @@ class BrightDataBrowserScraper:
         - Profile information
         - Extraction statistics
         """
-        print(f"\n{C.CYAN}{C.BOLD}══════════════════════════════════════════════════════════════════{C.RST}")
-        print(f"{C.CYAN}{C.BOLD}           Google AI Scrape (Bright Data Scraping Browser)         {C.RST}")
-        print(f"{C.CYAN}{C.BOLD}══════════════════════════════════════════════════════════════════{C.RST}")
+        # Set job ID for logging
+        if self.job_id:
+            Log.set_job(self.job_id)
         
-        # Log query and profile
-        print(f"\n{C.YELLOW}[Request]{C.RST}")
-        print(f"  ├─ Query:    {query}")
-        print(f"  ├─ Profile:  {self.profile_name} ({self.profile_config['type']})")
-        print(f"  ├─ Viewport: {self.profile_config['viewport']['width']}x{self.profile_config['viewport']['height']}")
-        print(f"  ├─ Mobile:   {self.profile_config.get('is_mobile', False)}")
-        print(f"  └─ Target Country: {self.country.upper()}")
+        # Single-line start log
+        vp = self.profile_config['viewport']
+        mobile = "mobile" if self.profile_config.get('is_mobile', False) else "desktop"
+        Log.step(f"[BROWSER] query=\"{query[:40]}\" country={self.country.upper()} profile={self.profile_name} viewport={vp['width']}x{vp['height']} type={mobile}")
         
         timestamp = datetime.now(timezone.utc).isoformat()
         html_content = ""
@@ -934,49 +946,43 @@ class BrightDataBrowserScraper:
             hl = lang_map.get(self.country, "en")
             url = f"https://www.google.com/search?udm=50&q={encoded_query}&hl={hl}&gl={self.country}"
             
-            Log.step(f"Loading Google AI Mode", "nav")
-            Log.data("URL", f"google.com/search?hl={hl}&gl={self.country}")
+            Log.step(f"[NAV] loading google.com/search?udm=50&hl={hl}&gl={self.country}")
             await self._page.goto(url, timeout=120000)
-            await asyncio.sleep(3)  # Wait for page to settle
+            await asyncio.sleep(3)
             
-            # Verify browser location (uses JS fetch, doesn't navigate)
+            # Verify browser location
             browser_geo = await self._verify_browser_location(use_cdp=True)
             
-            # Handle cookie consent FIRST (before anything else)
-            Log.step("Handling cookie consent", "cookies")
+            # Handle cookie consent
             cookie_handled = await self._handle_cookie_consent()
             if cookie_handled:
+                Log.ok("[COOKIES] accepted")
                 await asyncio.sleep(2)
             
-            # No screenshot here - only on final or error
-            
             # Wait for and handle CAPTCHA if present
-            Log.step("Checking for CAPTCHA", "captcha")
             captcha_status = await self._wait_for_captcha()
             self._captcha_solved = (captcha_status == "solved")
-            Log.data("CAPTCHA", captcha_status)
+            if captcha_status == "solved":
+                Log.ok("[CAPTCHA] solved")
+            elif captcha_status != "not_detected":
+                Log.info(f"[CAPTCHA] {captcha_status}")
             
-            # Check for cookie consent again (sometimes appears after CAPTCHA)
+            # Check for cookie consent again
             await self._handle_cookie_consent()
             
-            # Wait for AI response to generate
-            Log.step("Waiting for AI response", "wait")
+            # Wait for AI response
+            Log.step("[WAIT] AI response generating...")
             try:
-                # Wait for "Thinking" to disappear or content to appear
                 await asyncio.sleep(5)
-                for _ in range(30):  # Max 30 seconds
-                    # Try to dismiss any dialogs
+                for _ in range(30):
                     await self._handle_cookie_consent()
-                    
                     content = await self._page.content()
                     if "Thinking" not in content:
                         break
                     await asyncio.sleep(1)
-                Log.ok("Response ready")
+                Log.ok("[WAIT] response ready")
             except:
-                Log.warn("Response wait timeout")
-            
-            # No screenshot here - only on final or error
+                Log.warn("[WAIT] timeout")
             
             # Get HTML content
             html_content = await self._page.content()
@@ -985,20 +991,19 @@ class BrightDataBrowserScraper:
             if "unusual traffic" in html_content.lower() or "I'm not a robot" in html_content:
                 raise Exception("Blocked by Google despite Scraping Browser")
             
-            # Extract content with full text and all links
-            Log.step("Extracting FULL content", "extract")
+            # Extract content
+            Log.step("[EXTRACT] parsing content...")
             response_text, sources, extraction_stats = await self._extract_google_ai_response()
             
-            # Take FINAL screenshot only on success (if requested)
+            # Screenshot on success
+            screenshot_path = None
             if take_screenshot:
-                await self._screenshot("google_ai_final")
+                screenshot_path = await self._screenshot("success", self.job_id)
             
-            # Calculate cost estimate
+            # Calculate cost
             cost_estimate = self._estimate_cost(len(html_content.encode('utf-8')))
             
-            Log.result(True, f"Done - {len(sources)} sources")
-            Log.data("Cost", f"${cost_estimate.estimated_cost_usd:.4f} USD")
-            Log.data("Duration", f"{cost_estimate.duration_seconds:.1f}s")
+            Log.ok(f"[DONE] sources={len(sources)} cost=${cost_estimate.estimated_cost_usd:.4f} duration={cost_estimate.duration_seconds:.1f}s")
             
             return ScrapeResult(
                 query=query,
@@ -1023,21 +1028,25 @@ class BrightDataBrowserScraper:
                     "is_mobile": self.profile_config.get("is_mobile", False),
                     "user_agent": self.profile_config.get("user_agent", "")[:100] + "..."
                 },
-                extraction_stats=extraction_stats
+                extraction_stats=extraction_stats,
+                screenshot_path=screenshot_path,
             )
             
         except Exception as e:
-            Log.fail(f"Scrape failed: {e}")
+            Log.fail(f"[ERROR] {str(e)[:80]}")
             
             # ALWAYS take screenshot on error for debugging
+            error_screenshot = None
             if self._page:
-                await self._screenshot("google_ai_error")
+                error_screenshot = await self._screenshot("error", self.job_id)
+                if error_screenshot:
+                    Log.info(f"[SCREENSHOT] error saved: {error_screenshot}")
                 try:
                     html_content = await self._page.content()
                 except:
                     pass
             
-            # Still calculate cost estimate even on failure
+            # Calculate cost estimate even on failure
             cost_estimate = self._estimate_cost(len(html_content.encode('utf-8')) if html_content else 0)
             
             return ScrapeResult(
@@ -1060,7 +1069,8 @@ class BrightDataBrowserScraper:
                     "profile_name": self.profile_name,
                     "device_type": self.profile_config.get("type"),
                     "viewport": self.profile_config.get("viewport"),
-                }
+                },
+                screenshot_path=error_screenshot,
             )
         
         finally:
@@ -1085,17 +1095,13 @@ class BrightDataBrowserScraper:
         
         Returns ScrapeResult with full response.
         """
-        print(f"\n{C.CYAN}{C.BOLD}══════════════════════════════════════════════════════════════════{C.RST}")
-        print(f"{C.CYAN}{C.BOLD}           ChatGPT Scrape (Bright Data Scraping Browser)           {C.RST}")
-        print(f"{C.CYAN}{C.BOLD}══════════════════════════════════════════════════════════════════{C.RST}")
+        # Set job ID for logging
+        if self.job_id:
+            Log.set_job(self.job_id)
         
-        # Log query and profile
-        print(f"\n{C.YELLOW}[Request]{C.RST}")
-        print(f"  ├─ Query:    {query[:60]}{'...' if len(query) > 60 else ''}")
-        print(f"  ├─ Profile:  {self.profile_name} ({self.profile_config['type']})")
-        print(f"  ├─ Viewport: {self.profile_config['viewport']['width']}x{self.profile_config['viewport']['height']}")
-        print(f"  ├─ Mobile:   {self.profile_config.get('is_mobile', False)}")
-        print(f"  └─ Target Country: {self.country.upper()}")
+        vp = self.profile_config['viewport']
+        mobile = "mobile" if self.profile_config.get('is_mobile', False) else "desktop"
+        Log.step(f"[CHATGPT] query=\"{query[:40]}\" country={self.country.upper()} profile={self.profile_name} type={mobile}")
         
         timestamp = datetime.now(timezone.utc).isoformat()
         html_content = ""
@@ -1105,12 +1111,10 @@ class BrightDataBrowserScraper:
         try:
             await self._connect()
             
-            # Navigate to ChatGPT (use chatgpt.com for instant access)
-            Log.step("Loading ChatGPT", "nav")
-            Log.data("URL", "chatgpt.com")
-            # Use domcontentloaded instead of networkidle - ChatGPT has constant WebSocket activity
+            # Navigate to ChatGPT
+            Log.step("[NAV] loading chatgpt.com")
             await self._page.goto("https://chatgpt.com", wait_until="domcontentloaded", timeout=60000)
-            await asyncio.sleep(5)  # Wait for page to settle
+            await asyncio.sleep(5)
             
             # Verify browser location
             browser_geo = await self._verify_browser_location(use_cdp=True)
@@ -2208,6 +2212,7 @@ async def scrape_with_browser(
     profile: str = "desktop_1080p",
     custom_viewport: dict = None,
     scroll_full_page: bool = True,
+    job_id: int = None,
 ) -> ScrapeResult:
     """
     Convenience function to scrape using Bright Data Scraping Browser.
@@ -2225,6 +2230,7 @@ async def scrape_with_browser(
                         "macbook_air_13", "linux_desktop"
         custom_viewport: Custom viewport override {"width": int, "height": int}
         scroll_full_page: Whether to scroll to load all dynamic content
+        job_id: Job ID for screenshot naming and log correlation
     
     Returns:
         ScrapeResult with:
@@ -2233,13 +2239,14 @@ async def scrape_with_browser(
         - cost_estimate: Time and cost breakdown
         - profile_info: Device profile used
         - extraction_stats: Content extraction statistics
+        - screenshot_path: Path to screenshot (if taken)
     
     Example:
         # Desktop scrape
         result = await scrape_with_browser("best pasta brands", profile="desktop")
         
-        # iPhone scrape
-        result = await scrape_with_browser("best pasta brands", profile="iphone_14")
+        # iPhone scrape with job ID for traceability
+        result = await scrape_with_browser("best pasta brands", profile="iphone_14", job_id=123)
         
         # Custom viewport
         result = await scrape_with_browser(
@@ -2253,5 +2260,6 @@ async def scrape_with_browser(
         profile=profile,
         custom_viewport=custom_viewport,
         scroll_full_page=scroll_full_page,
+        job_id=job_id,
     )
     return await scraper.scrape(query, take_screenshot)

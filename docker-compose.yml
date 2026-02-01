@@ -350,9 +350,11 @@ services:
       - residential-proxy-se
     volumes:
       - ./data:/app/data
+      - ./data/screenshots:/app/data/screenshots  # Centralized screenshots folder
       - ./scripts:/app/scripts
       - ./src:/app/src
     environment:
+      - SCREENSHOTS_DIR=/app/data/screenshots
       # VPN Direct Proxies (Datacenter IPs via ProtonVPN)
       - PROXY_FR=http://vpn-fr:8888
       - PROXY_DE=http://vpn-de:8888
@@ -392,6 +394,10 @@ services:
     volumes:
       - ./backend:/app
       - ./data:/app/data
+      - ./data/screenshots:/app/data/screenshots  # Screenshots for API serving
+      - /var/run/docker.sock:/var/run/docker.sock:ro  # For Docker logs API
+    environment:
+      - SCREENSHOTS_DIR=/app/data/screenshots
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
   # Database UI (sqlite-web)
@@ -416,4 +422,16 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
       - PORT=9000
+    restart: unless-stopped
+
+  # Admin Dashboard - Full system management UI
+  admin-dashboard:
+    build:
+      context: ./admin-dashboard
+      dockerfile: Dockerfile
+    container_name: aiseo-admin
+    ports:
+      - "9091:9091"
+    environment:
+      - PORT=9091
     restart: unless-stopped

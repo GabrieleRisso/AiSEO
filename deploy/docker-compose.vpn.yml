@@ -1,0 +1,293 @@
+# Minimal VPN Docker Compose for Cloud Deployment
+# This runs only the VPN + Scraper services (not backend/frontend - those are on Railway)
+
+x-vpn-defaults: &vpn-defaults
+  image: qmcgaw/gluetun
+  cap_add:
+    - NET_ADMIN
+  devices:
+    - /dev/net/tun:/dev/net/tun
+  environment:
+    - VPN_SERVICE_PROVIDER=protonvpn
+    - VPN_TYPE=wireguard
+    - HTTPPROXY=on
+    - HTTPPROXY_PORT=8888
+    - HTTP_CONTROL_SERVER_ADDRESS=:8000
+    - UPDATER_PERIOD=24h
+    - LOG_LEVEL=info
+    - HEALTH_VPN_DURATION_INITIAL=10s
+    - HEALTH_VPN_DURATION_ADDITION=5s
+  restart: unless-stopped
+  logging:
+    driver: "json-file"
+    options:
+      max-size: "5m"
+      max-file: "2"
+
+x-residential-defaults: &residential-defaults
+  image: ginuerzh/gost
+  restart: unless-stopped
+  logging:
+    driver: "json-file"
+    options:
+      max-size: "3m"
+      max-file: "2"
+
+services:
+  # =============================================================================
+  # VPN Containers (8 countries)
+  # =============================================================================
+  vpn-fr:
+    <<: *vpn-defaults
+    container_name: vpn-fr
+    environment:
+      - VPN_SERVICE_PROVIDER=protonvpn
+      - VPN_TYPE=wireguard
+      - WIREGUARD_PRIVATE_KEY=${PROTONVPN_KEY_FR}
+      - SERVER_COUNTRIES=France
+      - HTTPPROXY=on
+      - HTTPPROXY_PORT=8888
+      - HTTP_CONTROL_SERVER_ADDRESS=:8000
+    ports:
+      - "8001:8888"
+      - "8101:8889"
+      - "9001:8000"
+
+  residential-proxy-fr:
+    <<: *residential-defaults
+    container_name: residential-proxy-fr
+    network_mode: "service:vpn-fr"
+    command: -L=:8889 -F=http://${BRIGHT_DATA_USER}-country-fr:${BRIGHT_DATA_PASSWORD}@${BRIGHT_DATA_HOST}:${BRIGHT_DATA_PORT}
+    depends_on:
+      - vpn-fr
+
+  vpn-de:
+    <<: *vpn-defaults
+    container_name: vpn-de
+    environment:
+      - VPN_SERVICE_PROVIDER=protonvpn
+      - VPN_TYPE=wireguard
+      - WIREGUARD_PRIVATE_KEY=${PROTONVPN_KEY_DE}
+      - SERVER_COUNTRIES=Germany
+      - HTTPPROXY=on
+      - HTTPPROXY_PORT=8888
+      - HTTP_CONTROL_SERVER_ADDRESS=:8000
+    ports:
+      - "8002:8888"
+      - "8102:8889"
+      - "9002:8000"
+
+  residential-proxy-de:
+    <<: *residential-defaults
+    container_name: residential-proxy-de
+    network_mode: "service:vpn-de"
+    command: -L=:8889 -F=http://${BRIGHT_DATA_USER}-country-de:${BRIGHT_DATA_PASSWORD}@${BRIGHT_DATA_HOST}:${BRIGHT_DATA_PORT}
+    depends_on:
+      - vpn-de
+
+  vpn-nl:
+    <<: *vpn-defaults
+    container_name: vpn-nl
+    environment:
+      - VPN_SERVICE_PROVIDER=protonvpn
+      - VPN_TYPE=wireguard
+      - WIREGUARD_PRIVATE_KEY=${PROTONVPN_KEY_NL}
+      - SERVER_COUNTRIES=Netherlands
+      - HTTPPROXY=on
+      - HTTPPROXY_PORT=8888
+      - HTTP_CONTROL_SERVER_ADDRESS=:8000
+    ports:
+      - "8003:8888"
+      - "8103:8889"
+      - "9003:8000"
+
+  residential-proxy-nl:
+    <<: *residential-defaults
+    container_name: residential-proxy-nl
+    network_mode: "service:vpn-nl"
+    command: -L=:8889 -F=http://${BRIGHT_DATA_USER}-country-nl:${BRIGHT_DATA_PASSWORD}@${BRIGHT_DATA_HOST}:${BRIGHT_DATA_PORT}
+    depends_on:
+      - vpn-nl
+
+  vpn-it:
+    <<: *vpn-defaults
+    container_name: vpn-it
+    environment:
+      - VPN_SERVICE_PROVIDER=protonvpn
+      - VPN_TYPE=wireguard
+      - WIREGUARD_PRIVATE_KEY=${PROTONVPN_KEY_IT}
+      - SERVER_COUNTRIES=Italy
+      - HTTPPROXY=on
+      - HTTPPROXY_PORT=8888
+      - HTTP_CONTROL_SERVER_ADDRESS=:8000
+    ports:
+      - "8004:8888"
+      - "8104:8889"
+      - "9004:8000"
+
+  residential-proxy-it:
+    <<: *residential-defaults
+    container_name: residential-proxy-it
+    network_mode: "service:vpn-it"
+    command: -L=:8889 -F=http://${BRIGHT_DATA_USER}-country-it:${BRIGHT_DATA_PASSWORD}@${BRIGHT_DATA_HOST}:${BRIGHT_DATA_PORT}
+    depends_on:
+      - vpn-it
+
+  vpn-es:
+    <<: *vpn-defaults
+    container_name: vpn-es
+    environment:
+      - VPN_SERVICE_PROVIDER=protonvpn
+      - VPN_TYPE=wireguard
+      - WIREGUARD_PRIVATE_KEY=${PROTONVPN_KEY_ES}
+      - SERVER_COUNTRIES=Spain
+      - HTTPPROXY=on
+      - HTTPPROXY_PORT=8888
+      - HTTP_CONTROL_SERVER_ADDRESS=:8000
+    ports:
+      - "8005:8888"
+      - "8105:8889"
+      - "9005:8000"
+
+  residential-proxy-es:
+    <<: *residential-defaults
+    container_name: residential-proxy-es
+    network_mode: "service:vpn-es"
+    command: -L=:8889 -F=http://${BRIGHT_DATA_USER}-country-es:${BRIGHT_DATA_PASSWORD}@${BRIGHT_DATA_HOST}:${BRIGHT_DATA_PORT}
+    depends_on:
+      - vpn-es
+
+  vpn-uk:
+    <<: *vpn-defaults
+    container_name: vpn-uk
+    environment:
+      - VPN_SERVICE_PROVIDER=protonvpn
+      - VPN_TYPE=wireguard
+      - WIREGUARD_PRIVATE_KEY=${PROTONVPN_KEY_UK}
+      - SERVER_COUNTRIES=United Kingdom
+      - HTTPPROXY=on
+      - HTTPPROXY_PORT=8888
+      - HTTP_CONTROL_SERVER_ADDRESS=:8000
+    ports:
+      - "8006:8888"
+      - "8106:8889"
+      - "9006:8000"
+
+  residential-proxy-uk:
+    <<: *residential-defaults
+    container_name: residential-proxy-uk
+    network_mode: "service:vpn-uk"
+    command: -L=:8889 -F=http://${BRIGHT_DATA_USER}-country-gb:${BRIGHT_DATA_PASSWORD}@${BRIGHT_DATA_HOST}:${BRIGHT_DATA_PORT}
+    depends_on:
+      - vpn-uk
+
+  vpn-ch:
+    <<: *vpn-defaults
+    container_name: vpn-ch
+    environment:
+      - VPN_SERVICE_PROVIDER=protonvpn
+      - VPN_TYPE=wireguard
+      - WIREGUARD_PRIVATE_KEY=${PROTONVPN_KEY_CH}
+      - SERVER_COUNTRIES=Switzerland
+      - HTTPPROXY=on
+      - HTTPPROXY_PORT=8888
+      - HTTP_CONTROL_SERVER_ADDRESS=:8000
+    ports:
+      - "8007:8888"
+      - "8107:8889"
+      - "9007:8000"
+
+  residential-proxy-ch:
+    <<: *residential-defaults
+    container_name: residential-proxy-ch
+    network_mode: "service:vpn-ch"
+    command: -L=:8889 -F=http://${BRIGHT_DATA_USER}-country-ch:${BRIGHT_DATA_PASSWORD}@${BRIGHT_DATA_HOST}:${BRIGHT_DATA_PORT}
+    depends_on:
+      - vpn-ch
+
+  vpn-se:
+    <<: *vpn-defaults
+    container_name: vpn-se
+    environment:
+      - VPN_SERVICE_PROVIDER=protonvpn
+      - VPN_TYPE=wireguard
+      - WIREGUARD_PRIVATE_KEY=${PROTONVPN_KEY_SE}
+      - SERVER_COUNTRIES=Sweden
+      - HTTPPROXY=on
+      - HTTPPROXY_PORT=8888
+      - HTTP_CONTROL_SERVER_ADDRESS=:8000
+    ports:
+      - "8008:8888"
+      - "8108:8889"
+      - "9008:8000"
+
+  residential-proxy-se:
+    <<: *residential-defaults
+    container_name: residential-proxy-se
+    network_mode: "service:vpn-se"
+    command: -L=:8889 -F=http://${BRIGHT_DATA_USER}-country-se:${BRIGHT_DATA_PASSWORD}@${BRIGHT_DATA_HOST}:${BRIGHT_DATA_PORT}
+    depends_on:
+      - vpn-se
+
+  # =============================================================================
+  # VPN Dashboard
+  # =============================================================================
+  vpn-dashboard:
+    build:
+      context: ./vpn-dashboard
+      dockerfile: Dockerfile
+    container_name: vpn-dashboard
+    ports:
+      - "9090:9090"
+    environment:
+      - VPN_ENDPOINTS=vpn-fr:8000,vpn-de:8000,vpn-nl:8000,vpn-it:8000,vpn-es:8000,vpn-uk:8000,vpn-ch:8000,vpn-se:8000
+    restart: unless-stopped
+
+  # =============================================================================
+  # Scraper API
+  # =============================================================================
+  scraper:
+    build:
+      context: .
+      dockerfile: Dockerfile.scraper
+    container_name: aiseo-scraper
+    depends_on:
+      - vpn-fr
+      - vpn-de
+      - vpn-nl
+      - vpn-it
+      - vpn-es
+      - vpn-uk
+      - vpn-ch
+      - vpn-se
+    volumes:
+      - ./data:/app/data
+      - ./data/screenshots:/app/data/screenshots
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - SCREENSHOTS_DIR=/app/data/screenshots
+      - PROXY_FR=http://vpn-fr:8888
+      - PROXY_DE=http://vpn-de:8888
+      - PROXY_NL=http://vpn-nl:8888
+      - PROXY_IT=http://vpn-it:8888
+      - PROXY_ES=http://vpn-es:8888
+      - PROXY_UK=http://vpn-uk:8888
+      - PROXY_CH=http://vpn-ch:8888
+      - PROXY_SE=http://vpn-se:8888
+      - RESIDENTIAL_PROXY_FR=http://vpn-fr:8889
+      - RESIDENTIAL_PROXY_DE=http://vpn-de:8889
+      - RESIDENTIAL_PROXY_NL=http://vpn-nl:8889
+      - RESIDENTIAL_PROXY_IT=http://vpn-it:8889
+      - RESIDENTIAL_PROXY_ES=http://vpn-es:8889
+      - RESIDENTIAL_PROXY_UK=http://vpn-uk:8889
+      - RESIDENTIAL_PROXY_CH=http://vpn-ch:8889
+      - RESIDENTIAL_PROXY_SE=http://vpn-se:8889
+      - BRIGHTDATA_API_TOKEN=${BRIGHTDATA_API_TOKEN}
+      - BRIGHTDATA_CUSTOMER_ID=${BRIGHTDATA_CUSTOMER_ID:-hl_0d78e46f}
+      - BRIGHTDATA_BROWSER_ZONE=${BRIGHTDATA_BROWSER_ZONE:-scraping_browser1}
+      - BRIGHTDATA_BROWSER_PASSWORD=${BRIGHTDATA_BROWSER_PASSWORD}
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "5000:5000"
+    command: uvicorn src.scraper_api:app --host 0.0.0.0 --port 5000
+    restart: unless-stopped

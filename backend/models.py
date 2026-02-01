@@ -82,6 +82,8 @@ class ScrapeJob(SQLModel, table=True):
     profile_data: str | None = None  # JSON string of profile metadata
     config_snapshot: str | None = None # JSON string of request config
     html_snapshot: str | None = None # Full HTML content of the page
+    screenshot_path: str | None = None  # Path to screenshot file (relative to screenshots folder)
+    logs: str | None = None  # JSON string of log entries during job execution
     prompt_id: int | None = Field(default=None, foreign_key="prompt.id")
     
     # Scheduling fields

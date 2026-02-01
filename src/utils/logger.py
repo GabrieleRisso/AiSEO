@@ -35,18 +35,35 @@ Colors = C
 
 
 class Log:
-    """Minimal logger with colors and timing."""
+    """Minimal logger with colors, timing, and job ID tracking."""
     
     _start_times: Dict[str, float] = {}
+    _job_id: Optional[int] = None
+    
+    @classmethod
+    def set_job(cls, job_id: int):
+        """Set current job ID for log correlation."""
+        cls._job_id = job_id
+    
+    @classmethod
+    def clear_job(cls):
+        """Clear job ID."""
+        cls._job_id = None
     
     @staticmethod
     def _ts() -> str:
         return f"{C.DIM}{datetime.now().strftime('%H:%M:%S')}{C.RST}"
     
-    @staticmethod
-    def _fmt(icon: str, color: str, msg: str, elapsed: float = None) -> str:
+    @classmethod
+    def _jid(cls) -> str:
+        if cls._job_id:
+            return f"{C.CYAN}[job:{cls._job_id}]{C.RST} "
+        return ""
+    
+    @classmethod
+    def _fmt(cls, icon: str, color: str, msg: str, elapsed: float = None) -> str:
         time_str = f" {C.DIM}({elapsed:.1f}s){C.RST}" if elapsed else ""
-        return f"{Log._ts()} {color}{icon}{C.RST} {msg}{time_str}"
+        return f"{cls._ts()} {cls._jid()}{color}{icon}{C.RST} {msg}{time_str}"
     
     @classmethod
     def step(cls, msg: str, key: str = None):

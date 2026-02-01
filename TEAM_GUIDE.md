@@ -10,9 +10,9 @@ docker-compose up -d scraper backend
 ```
 
 ### 2. Access Documentation
-- **Swagger UI**: http://localhost:8000/docs
-- **ReDoc**: http://localhost:8000/redoc
-- **Scraper API**: http://localhost:5000/docs
+- **Backend Swagger UI**: http://localhost:8000/docs
+- **Backend ReDoc**: http://localhost:8000/redoc
+- **Scraper API Docs**: http://localhost:5000/docs
 
 ### 3. Test APIs
 ```bash
@@ -336,8 +336,9 @@ curl http://localhost:8000/api/health
 - `postman/README.md` - Postman setup guide
 
 ### For Documentation
-- Swagger UI: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc
+- Backend Swagger UI: http://localhost:8000/docs
+- Backend ReDoc: http://localhost:8000/redoc
+- Scraper API Docs: http://localhost:5000/docs
 
 ---
 
@@ -345,9 +346,10 @@ curl http://localhost:8000/api/health
 
 ### Beginner
 1. Read this guide
-2. Open Swagger UI: http://localhost:8000/docs
-3. Try health endpoints
-4. Try config endpoints
+2. Open Backend Swagger UI: http://localhost:8000/docs
+3. Open Scraper API Docs: http://localhost:5000/docs
+4. Try health endpoints
+5. Try config endpoints
 
 ### Intermediate
 1. Use Postman collection
@@ -366,13 +368,14 @@ curl http://localhost:8000/api/health
 ## 📞 Getting Help
 
 ### Documentation
-- **Swagger UI**: Interactive API explorer
-- **ReDoc**: Beautiful documentation view
+- **Backend Swagger UI**: http://localhost:8000/docs - Interactive API explorer
+- **Backend ReDoc**: http://localhost:8000/redoc - Beautiful documentation view
+- **Scraper API Docs**: http://localhost:5000/docs - Scraper API documentation
 - **API_DOCS.md**: Detailed endpoint docs
 - **Postman Collection**: Pre-configured requests
 
 ### Testing
-- **Swagger UI**: Try endpoints directly
+- **Swagger UI**: Try endpoints directly (Backend: http://localhost:8000/docs, Scraper: http://localhost:5000/docs)
 - **Postman**: Run automated tests
 - **cURL**: Command-line testing
 
