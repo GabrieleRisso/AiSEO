@@ -6,16 +6,22 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from dataclasses import asdict
-from src.scrapers.google_ai_scraper import GoogleAIScraper, ScrapeResult
-from src.scrapers.perplexity_scraper import PerplexityScraper
-from src.scrapers.brightdata_scraper import BrightDataScraper
-from src.scrapers.chatgpt_scraper import ChatGPTScraper
-from src.scrapers.base import BaseScraper
+
+# Import scrapers from new organized structure
+from src.scrapers.google import GoogleAIScraper
+from src.scrapers.google.scraper import ScrapeResult
+from src.scrapers.perplexity import PerplexityScraper
+from src.scrapers.chatgpt import ChatGPTScraper
+from src.scrapers.common.base import BaseScraper
+
 try:
-    from src.scrapers.brightdata_browser_scraper import BrightDataBrowserScraper, scrape_with_browser
+    from src.scrapers.common.brightdata_browser import BrightDataBrowserScraper, scrape_with_browser
     SCRAPING_BROWSER_AVAILABLE = True
 except ImportError:
     SCRAPING_BROWSER_AVAILABLE = False
+
+# BrightDataScraper is deprecated, use BrightDataBrowserScraper instead
+BrightDataScraper = None
 from src.lib.antidetect import AntiDetectLayer, AntiDetectConfig
 from src.lib.profiles import ProfileManager
 
@@ -71,8 +77,8 @@ def get_scraper_class(scraper_type: str):
     scrapers = {
         "google_ai": GoogleAIScraper,
         "perplexity": PerplexityScraper,
-        "brightdata": BrightDataScraper,
-        "chatgpt": ChatGPTScraper
+        "chatgpt": ChatGPTScraper,
+        # "brightdata" is now handled via BrightDataBrowserScraper
     }
     return scrapers.get(scraper_type, GoogleAIScraper)
 
@@ -98,9 +104,27 @@ class ScrapeRequest(BaseModel):
     )
     take_screenshot: bool = Field(default=False, description="Capture screenshot during scraping", example=False)
     headless: bool = Field(default=True, description="Run browser in headless mode", example=True)
-    use_residential_proxy: bool = Field(default=False, description="Use residential proxy instead of datacenter VPN", example=False)
-    use_scraping_browser: bool = Field(default=False, description="Use Bright Data Scraping Browser (cloud browser with automatic CAPTCHA solving)", example=False)
+    
+    # Proxy Layer Selection
+    proxy_layer: str = Field(
+        default="auto",
+        description="""Proxy layer to use. Options:
+        - 'auto': Automatically select best layer for the target site (recommended)
+        - 'vpn_direct': Layer 1 - VPN datacenter IP (cheapest, free after subscription)
+        - 'residential': Layer 2 - VPN + Bright Data residential (~$8.40/GB)
+        - 'web_unlocker': Layer 3 - Bright Data Web Unlocker API (~$3-10/1000 requests)
+        - 'scraping_browser': Layer 4 - Cloud browser with CAPTCHA solving (~$0.01-0.03/request)
+        """,
+        example="auto"
+    )
+    use_residential_proxy: bool = Field(default=False, description="[DEPRECATED] Use proxy_layer='residential' instead", example=False)
+    use_scraping_browser: bool = Field(default=False, description="[DEPRECATED] Use proxy_layer='scraping_browser' instead", example=False)
+    use_web_unlocker: bool = Field(default=False, description="Use Bright Data Web Unlocker API for managed unlocking", example=False)
     human_behavior: bool = Field(default=True, description="Enable human-like behavior simulation", example=True)
+    
+    # Smart scraper settings
+    prefer_cost: bool = Field(default=True, description="Prefer cheaper proxy layers when auto-selecting", example=True)
+    enable_fallback: bool = Field(default=True, description="Enable fallback to more expensive layers on failure", example=True)
     
     # Viewport/Profile settings for Scraping Browser
     profile: str = Field(
@@ -133,8 +157,9 @@ class ScrapeRequest(BaseModel):
                 "scraper_type": "google_ai",
                 "take_screenshot": False,
                 "headless": True,
-                "use_residential_proxy": False,
-                "use_scraping_browser": True,
+                "proxy_layer": "auto",
+                "prefer_cost": True,
+                "enable_fallback": True,
                 "profile": "desktop_1080p",
                 "scroll_full_page": True
             }
@@ -151,12 +176,16 @@ def get_proxy_for_country(country_code: str, use_residential: bool = False) -> O
     Proxy Resolution Priority:
     - Residential Proxy (if use_residential=True):
       1. Check for custom RESIDENTIAL_PROXY_{COUNTRY} env var
-      2. Check for known sidecar proxies (e.g., Italy on port 8889)
-      3. Fall back to datacenter VPN
+      2. Use standard sidecar convention: http://vpn-{country}:8889
+      3. Fall back to datacenter VPN if no residential available
     
     - Datacenter VPN (if use_residential=False):
       1. Check for PROXY_{COUNTRY} env var
       2. Use standard VPN container format: http://vpn-{country}:8888
+    
+    Network Chain:
+    - Datacenter: Client → VPN Container (ProtonVPN) → Target
+    - Residential: Client → VPN Container → GOST Sidecar → Bright Data Residential → Target
     
     Args:
         country_code: Two-letter country code (lowercase, e.g., "us", "it")
@@ -166,41 +195,41 @@ def get_proxy_for_country(country_code: str, use_residential: bool = False) -> O
         Proxy URL string (e.g., "http://vpn-us:8888") or None if not found
     
     Examples:
-        >>> get_proxy_for_country("us")
-        'http://vpn-us:8888'
+        >>> get_proxy_for_country("fr")
+        'http://vpn-fr:8888'
         
         >>> get_proxy_for_country("it", use_residential=True)
         'http://vpn-it:8889'
     """
     country_code = country_code.lower()
     
-    # Priority 1: Check if there's a specific env var override
+    # All supported countries with VPN + Residential proxy sidecars
+    supported_countries = ["fr", "de", "nl", "it", "es", "uk", "ch", "se"]
+    
+    # Priority 1: Residential Proxy (VPN -> Bright Data chain)
     if use_residential:
+        # Check for custom env var override first
         env_var_name = f"RESIDENTIAL_PROXY_{country_code.upper()}"
         if os.environ.get(env_var_name):
             proxy = os.environ.get(env_var_name)
-            logger.info(f"Using Residential Proxy for {country_code}: {proxy} (Custom Env Var)")
+            logger.info(f"Using Residential Proxy for {country_code}: {proxy} (Env Var)")
             return proxy
             
-        # Fallback to standard sidecar convention
-        # We assume if a VPN exists for this country, we might have a sidecar on port 8889
-        known_sidecars = ["it"] 
-        if country_code in known_sidecars:
+        # Use standard sidecar convention for all supported countries
+        if country_code in supported_countries:
             proxy = f"http://vpn-{country_code}:8889"
-            logger.info(f"Using Residential Proxy Sidecar for {country_code}: {proxy} (Matches VPN Country)")
+            logger.info(f"Using Residential Proxy Sidecar for {country_code}: {proxy}")
             return proxy
             
-        # If no sidecar, maybe fall back to standard VPN or fail?
-        logger.warning(f"No residential sidecar found for {country_code}, falling back to datacenter VPN")
+        # If country not supported for residential, warn and fall back
+        logger.warning(f"No residential sidecar for {country_code}, falling back to datacenter VPN")
 
     # Priority 2: Standard Datacenter VPN (Gluetun)
     env_var_name = f"PROXY_{country_code.upper()}"
     proxy_url = os.environ.get(env_var_name)
     
-    if not proxy_url:
-        known_vpns = ["fr", "de", "nl", "it", "es", "us", "uk", "ch", "se"]
-        if country_code in known_vpns:
-            proxy_url = f"http://vpn-{country_code}:8888"
+    if not proxy_url and country_code in supported_countries:
+        proxy_url = f"http://vpn-{country_code}:8888"
             
     if proxy_url:
         logger.info(f"Using Datacenter VPN Proxy for {country_code}: {proxy_url}")
@@ -209,6 +238,35 @@ def get_proxy_for_country(country_code: str, use_residential: bool = False) -> O
         
     return proxy_url
 
+
+def get_all_proxy_configs() -> dict:
+    """
+    Get all available proxy configurations.
+    
+    Returns a dict with:
+    - datacenter: Dict of country -> VPN proxy URL
+    - residential: Dict of country -> Residential proxy URL
+    - supported_countries: List of all supported country codes
+    """
+    supported_countries = ["fr", "de", "nl", "it", "es", "uk", "ch", "se"]
+    
+    datacenter = {}
+    residential = {}
+    
+    for cc in supported_countries:
+        # Check env var or use default
+        dc_env = f"PROXY_{cc.upper()}"
+        res_env = f"RESIDENTIAL_PROXY_{cc.upper()}"
+        
+        datacenter[cc] = os.environ.get(dc_env, f"http://vpn-{cc}:8888")
+        residential[cc] = os.environ.get(res_env, f"http://vpn-{cc}:8889")
+    
+    return {
+        "datacenter": datacenter,
+        "residential": residential,
+        "supported_countries": supported_countries,
+    }
+
 @app.get(
     "/config",
     tags=["config"],
@@ -216,7 +274,8 @@ def get_proxy_for_country(country_code: str, use_residential: bool = False) -> O
     description="""
     Returns available system configuration including:
     - Supported scraper types (google_ai, perplexity, brightdata, chatgpt)
-    - Available proxy countries
+    - Available proxy countries (datacenter and residential)
+    - Proxy type options
     - Default scraper type
     """,
     response_description="Configuration object with scrapers and proxies",
@@ -227,8 +286,13 @@ def get_proxy_for_country(country_code: str, use_residential: bool = False) -> O
                 "application/json": {
                     "example": {
                         "scrapers": ["google_ai", "perplexity", "brightdata", "chatgpt"],
-                        "proxies": ["ch", "de", "es", "fr", "it", "nl", "se", "uk"],
-                        "default_scraper": "google_ai"
+                        "proxies": {
+                            "datacenter": {"fr": "http://vpn-fr:8888", "...": "..."},
+                            "residential": {"fr": "http://vpn-fr:8889", "...": "..."},
+                            "supported_countries": ["fr", "de", "nl", "it", "es", "uk", "ch", "se"]
+                        },
+                        "default_scraper": "google_ai",
+                        "scraping_browser_available": True
                     }
                 }
             }
@@ -241,55 +305,77 @@ def get_config():
     
     Returns information about:
     - Available scraper types (google_ai, perplexity, brightdata, chatgpt)
-    - Configured proxy countries (ch, de, es, fr, it, nl, se, uk)
+    - Configured proxy countries with both datacenter and residential options
     - Default scraper selection (google_ai)
+    - Whether Scraping Browser is available
     
     Returns:
-        dict: Configuration object with scrapers list, proxies list, and default scraper
+        dict: Configuration object with scrapers, proxies, and capabilities
     
     Example Response:
         {
             "scrapers": ["google_ai", "perplexity", "brightdata", "chatgpt"],
-            "proxies": ["ch", "de", "es", "fr", "it", "nl", "se", "uk"],
-            "default_scraper": "google_ai"
+            "proxies": {
+                "datacenter": {"fr": "http://vpn-fr:8888", ...},
+                "residential": {"fr": "http://vpn-fr:8889", ...},
+                "supported_countries": ["fr", "de", "nl", "it", "es", "uk", "ch", "se"]
+            },
+            "default_scraper": "google_ai",
+            "scraping_browser_available": true
         }
     """
-    # Read available proxies from environment variables
-    proxies = []
-    for k, v in os.environ.items():
-        if k.startswith("PROXY_"):
-            proxies.append(k.replace("PROXY_", "").lower())
+    proxy_configs = get_all_proxy_configs()
     
     return {
         "scrapers": ["google_ai", "perplexity", "brightdata", "chatgpt"],
-        "proxies": sorted(proxies),
-        "default_scraper": "google_ai"
+        "proxies": proxy_configs,
+        "default_scraper": "google_ai",
+        "scraping_browser_available": SCRAPING_BROWSER_AVAILABLE,
+        "proxy_types": {
+            "datacenter": "VPN direct (ProtonVPN via Gluetun) - port 8888",
+            "residential": "VPN + Bright Data residential chain - port 8889",
+            "scraping_browser": "Bright Data cloud browser with auto-CAPTCHA"
+        }
     }
 
-def log_network_chain(country: str, vpn_proxy: str, use_residential: bool, use_scraping_browser: bool, profile: str):
+def log_network_chain(country: str, layer2_mode: str, profile: str) -> dict:
     """
     Log the full network chain for traceability.
     
-    Shows: Client → VPN → Proxy/Browser → Target
+    Two-Layer Architecture:
+    - Layer 1: VPN (always active)
+    - Layer 2: Enhancement mode (direct, residential, unlocker, browser)
+    
+    Returns origin verification info.
     """
     from src.utils.logger import Log, C
     import requests
     
-    print(f"\n{C.CYAN}{C.BOLD}═══════════════════════════════════════════════════════════════{C.RST}")
-    print(f"{C.CYAN}{C.BOLD}                    NETWORK CHAIN CONFIGURATION                 {C.RST}")
-    print(f"{C.CYAN}{C.BOLD}═══════════════════════════════════════════════════════════════{C.RST}")
-    
-    # Layer 1: VPN
     vpn_country = country.upper()
     vpn_host = f"vpn-{country.lower()}"
-    print(f"\n{C.YELLOW}[Layer 1: VPN]{C.RST}")
+    vpn_proxy = f"http://vpn-{country.lower()}:8888"
+    
+    origin_info = {
+        "ip": None,
+        "city": None,
+        "country": None,
+        "verified": False,
+        "warning": None,
+    }
+    
+    print(f"\n{C.CYAN}{C.BOLD}═══════════════════════════════════════════════════════════════{C.RST}")
+    print(f"{C.CYAN}{C.BOLD}           TWO-LAYER PROXY CONFIGURATION                       {C.RST}")
+    print(f"{C.CYAN}{C.BOLD}═══════════════════════════════════════════════════════════════{C.RST}")
+    
+    # Layer 1: VPN (Always Active)
+    print(f"\n{C.YELLOW}[Layer 1: VPN - Always Active]{C.RST}")
     print(f"  ├─ Provider:  ProtonVPN (via Gluetun)")
     print(f"  ├─ Target:    {vpn_country}")
     print(f"  ├─ Container: {vpn_host}")
-    print(f"  └─ HTTP Proxy: {vpn_proxy or 'Not configured'}")
+    print(f"  └─ HTTP Proxy: {vpn_proxy}")
     
-    # Verify VPN IP if proxy is available
-    if vpn_proxy and not use_scraping_browser:
+    # Verify VPN IP (except for browser mode which verifies separately)
+    if layer2_mode != "browser":
         try:
             resp = requests.get(
                 "https://ipinfo.io/json",
@@ -298,53 +384,101 @@ def log_network_chain(country: str, vpn_proxy: str, use_residential: bool, use_s
             )
             if resp.status_code == 200:
                 geo = resp.json()
-                vpn_ip = geo.get("ip", "Unknown")
-                vpn_actual_country = geo.get("country", "Unknown")
-                vpn_city = geo.get("city", "Unknown")
-                print(f"\n{C.GREEN}[VPN IP Verified]{C.RST}")
-                print(f"  ├─ IP:       {vpn_ip}")
-                print(f"  ├─ Country:  {vpn_actual_country}")
-                print(f"  └─ City:     {vpn_city}")
+                origin_info["ip"] = geo.get("ip", "Unknown")
+                origin_info["city"] = geo.get("city", "Unknown")
+                origin_info["country"] = geo.get("country", "Unknown")
                 
-                if vpn_actual_country.upper() != vpn_country:
-                    print(f"  {C.YELLOW}⚠ Warning: VPN country mismatch!{C.RST}")
+                print(f"\n{C.GREEN}[VPN Origin Verified]{C.RST}")
+                print(f"  ├─ IP:       {origin_info['ip']}")
+                print(f"  ├─ Country:  {origin_info['country']}")
+                print(f"  └─ City:     {origin_info['city']}")
+                
+                # Check for Zurich (ProtonVPN HQ) - incorrect routing
+                city_lower = origin_info["city"].lower() if origin_info["city"] else ""
+                is_zurich = any(z in city_lower for z in ["zurich", "zürich", "zuerich"])
+                
+                if is_zurich and vpn_country != "CH":
+                    origin_info["warning"] = f"⚠️ Origin is Zurich (ProtonVPN HQ) but target is {vpn_country}. VPN may not be routing correctly."
+                    print(f"\n  {C.RED}{origin_info['warning']}{C.RST}")
+                    print(f"  {C.RED}Check PROTONVPN_KEY_{vpn_country} in .env{C.RST}")
+                elif origin_info["country"].upper() != vpn_country:
+                    origin_info["warning"] = f"⚠️ Origin country is {origin_info['country']} but expected {vpn_country}. VPN key may be incorrect."
+                    print(f"\n  {C.YELLOW}{origin_info['warning']}{C.RST}")
+                else:
+                    origin_info["verified"] = True
+                    print(f"  {C.GREEN}✓ Origin verified for {vpn_country}{C.RST}")
+                    
         except Exception as e:
-            print(f"  {C.YELLOW}⚠ VPN IP verification failed: {e}{C.RST}")
+            origin_info["warning"] = f"VPN IP verification failed: {e}"
+            print(f"  {C.YELLOW}⚠ {origin_info['warning']}{C.RST}")
     
-    # Layer 2: Proxy/Browser
-    print(f"\n{C.YELLOW}[Layer 2: Proxy/Browser]{C.RST}")
-    if use_scraping_browser:
-        print(f"  ├─ Type:      Bright Data Scraping Browser (Cloud)")
-        print(f"  ├─ Method:    CDP over WebSocket")
-        print(f"  ├─ Country:   {vpn_country} (via -country-{country.lower()} flag)")
-        print(f"  ├─ Features:  Auto CAPTCHA, Fingerprint Mgmt, Residential IPs")
-        print(f"  └─ Endpoint:  wss://brd.superproxy.io:9222")
-        print(f"\n  {C.CYAN}Note: Browser IP will be verified after connection{C.RST}")
-    elif use_residential:
-        print(f"  ├─ Type:      Bright Data Residential Proxy")
-        print(f"  ├─ Method:    HTTP Proxy via gost sidecar")
-        print(f"  ├─ Zone:      aiseo_1")
-        print(f"  └─ Port:      8889 (via VPN tunnel)")
-    else:
-        print(f"  ├─ Type:      VPN Direct (Datacenter)")
-        print(f"  ├─ Method:    HTTP Proxy")
-        print(f"  └─ Port:      8888")
+    # Layer 2: Enhancement Mode
+    print(f"\n{C.YELLOW}[Layer 2: Enhancement Mode]{C.RST}")
     
-    # Layer 3: Device Profile
-    print(f"\n{C.YELLOW}[Layer 3: Device Profile]{C.RST}")
+    layer2_info = {
+        "direct": ("VPN Only (Datacenter)", "Free", f"Client → [{vpn_host}] → Target"),
+        "residential": ("Residential IP", "~$8.40/GB", f"Client → [{vpn_host}] → [Bright Data Residential] → Target"),
+        "unlocker": ("Web Unlocker API", "~$3-10/1000 req", f"Client → [Bright Data Unlocker] → Target"),
+        "browser": ("Cloud Browser", "~$0.01-0.03/req", f"Client → [Bright Data Browser ({vpn_country})] → Target"),
+    }
+    
+    mode_name, mode_cost, chain = layer2_info.get(layer2_mode, layer2_info["direct"])
+    
+    print(f"  ├─ Mode:      {layer2_mode}")
+    print(f"  ├─ Type:      {mode_name}")
+    print(f"  └─ Cost:      {mode_cost}")
+    
+    # Device Profile
+    print(f"\n{C.YELLOW}[Device Profile]{C.RST}")
     print(f"  └─ Profile:   {profile}")
     
-    # Show the chain
-    if use_scraping_browser:
-        chain = f"Client → [Bright Data Browser ({vpn_country})] → Target"
-    elif use_residential:
-        chain = f"Client → [{vpn_host}] → [Bright Data Residential] → Target"
-    else:
-        chain = f"Client → [{vpn_host}] → Target"
-    
+    # Network Path
     print(f"\n{C.GREEN}[Network Path]{C.RST}")
     print(f"  {chain}")
     print(f"{C.CYAN}═══════════════════════════════════════════════════════════════{C.RST}\n")
+    
+    return origin_info
+
+
+def resolve_layer2_mode(request) -> str:
+    """
+    Resolve the Layer 2 mode from request parameters.
+    
+    Priority:
+    1. Explicit proxy_layer parameter
+    2. Legacy use_scraping_browser flag
+    3. Legacy use_residential_proxy flag
+    4. Auto-select based on scraper_type
+    """
+    # Handle explicit proxy_layer
+    if request.proxy_layer and request.proxy_layer != "auto":
+        # Map old names to new
+        layer_map = {
+            "vpn_direct": "direct",
+            "web_unlocker": "unlocker",
+            "scraping_browser": "browser",
+        }
+        return layer_map.get(request.proxy_layer, request.proxy_layer)
+    
+    # Handle legacy flags
+    if request.use_scraping_browser:
+        return "browser"
+    if request.use_residential_proxy:
+        return "residential"
+    if request.use_web_unlocker:
+        return "unlocker"
+    
+    # Auto-select based on scraper type
+    scraper_modes = {
+        "google_ai": "unlocker",  # Google requires CAPTCHA bypass
+        "chatgpt": "browser",      # ChatGPT requires browser automation
+        "perplexity": "browser",   # Perplexity requires browser automation
+    }
+    
+    if request.proxy_layer == "auto":
+        return scraper_modes.get(request.scraper_type, "direct")
+    
+    return "direct"
 
 
 @app.post(
@@ -456,23 +590,32 @@ async def run_scrape(request: ScrapeRequest):
             "metadata": {...}
         }
     """
-    logger.info(f"Received scrape request: {request.query} [{request.country}] type={request.scraper_type} residential={request.use_residential_proxy} scraping_browser={request.use_scraping_browser}")
+    # Resolve Layer 2 mode
+    layer2_mode = resolve_layer2_mode(request)
     
-    # 1. Resolve Proxy
-    proxy_url = get_proxy_for_country(request.country, request.use_residential_proxy)
-    if not proxy_url:
-        logger.warning(f"No proxy found for country {request.country}, defaulting to None (direct connection)")
-    else:
-        logger.info(f"Using proxy: {proxy_url}")
+    logger.info(f"Scrape request: {request.query} [{request.country}] scraper={request.scraper_type} layer2={layer2_mode}")
     
-    # Log the full network chain for traceability
-    log_network_chain(
+    # Build proxy config
+    from src.scrapers.common.base import ProxyLayerConfig
+    proxy_config = ProxyLayerConfig(country=request.country, layer2_mode=layer2_mode)
+    proxy_url = proxy_config.active_proxy
+    
+    logger.info(f"Layer 1 (VPN): {proxy_config.vpn_proxy_url}")
+    logger.info(f"Layer 2 ({layer2_mode}): {proxy_url}")
+    
+    # Log and verify origin
+    origin_info = log_network_chain(
         country=request.country,
-        vpn_proxy=proxy_url,
-        use_residential=request.use_residential_proxy,
-        use_scraping_browser=request.use_scraping_browser,
+        layer2_mode=layer2_mode,
         profile=request.profile
     )
+    
+    # Update proxy config with origin info
+    proxy_config.origin_ip = origin_info.get("ip")
+    proxy_config.origin_city = origin_info.get("city")
+    proxy_config.origin_country = origin_info.get("country")
+    proxy_config.origin_verified = origin_info.get("verified", False)
+    proxy_config.origin_warning = origin_info.get("warning")
 
     # 2. Configure Anti-Detect
     ad_config = AntiDetectConfig()
@@ -494,8 +637,10 @@ async def run_scrape(request: ScrapeRequest):
     
     # 3. Run Scraper
     try:
-        # Check if Scraping Browser is requested (for Google with CAPTCHA bypass)
-        if request.use_scraping_browser and SCRAPING_BROWSER_AVAILABLE:
+        # Check if browser mode is requested
+        use_browser = (layer2_mode == "browser") and SCRAPING_BROWSER_AVAILABLE
+        
+        if use_browser:
             logger.info(f"Using Bright Data Scraping Browser for {request.scraper_type}")
             logger.info(f"Profile: {request.profile}, Viewport: {request.custom_viewport}, Scroll: {request.scroll_full_page}")
             
@@ -514,11 +659,10 @@ async def run_scrape(request: ScrapeRequest):
                 "query": request.query,
                 "country": request.country,
                 "scraper_type": request.scraper_type,
+                "layer2_mode": layer2_mode,
                 "profile": request.profile,
                 "custom_viewport": request.custom_viewport,
                 "scroll_full_page": request.scroll_full_page,
-                "use_scraping_browser": request.use_scraping_browser,
-                "use_residential_proxy": request.use_residential_proxy,
                 "take_screenshot": request.take_screenshot,
                 "headless": request.headless,
                 "human_behavior": request.human_behavior,
@@ -527,15 +671,16 @@ async def run_scrape(request: ScrapeRequest):
             # Build network chain info for traceability
             browser_geo = result.connectivity_info.get("browser_geo", {}) if result.connectivity_info else {}
             network_chain = {
-                "layer_1_vpn": {
+                "layer1_vpn": {
                     "provider": "ProtonVPN (Gluetun)",
                     "target_country": request.country.upper(),
                     "container": f"vpn-{request.country.lower()}",
-                    "http_proxy": proxy_url,
-                    "note": "VPN not used directly when using Scraping Browser"
+                    "proxy_url": proxy_config.vpn_proxy_url,
+                    "note": "VPN container available but Browser uses Bright Data's network",
                 },
-                "layer_2_browser": {
-                    "type": "Bright Data Scraping Browser",
+                "layer2_mode": layer2_mode,
+                "layer2_browser": {
+                    "type": "Cloud Browser",
                     "method": "CDP over WebSocket",
                     "endpoint": "wss://brd.superproxy.io:9222",
                     "target_country": request.country.upper(),
@@ -546,9 +691,9 @@ async def run_scrape(request: ScrapeRequest):
                     "verified_city": browser_geo.get("city"),
                     "country_match": browser_geo.get("country_match", False),
                 },
-                "layer_3_profile": result.profile_info if result.profile_info else {
+                "device_profile": result.profile_info if result.profile_info else {
                     "profile_name": request.profile,
-                    "device_type": "phone" if "phone" in request.profile or "iphone" in request.profile or "pixel" in request.profile or "samsung" in request.profile else "desktop",
+                    "device_type": "phone" if any(x in request.profile for x in ["phone", "iphone", "pixel", "samsung"]) else "desktop",
                 },
                 "chain_path": f"Client → [Bright Data Browser ({request.country.upper()})] → Target"
             }
@@ -574,19 +719,13 @@ async def run_scrape(request: ScrapeRequest):
                 }
             }
             return result_dict
-        elif request.use_scraping_browser and not SCRAPING_BROWSER_AVAILABLE:
-            logger.warning("Scraping Browser requested but playwright not available, falling back to standard scraper")
+        elif layer2_mode == "browser" and not SCRAPING_BROWSER_AVAILABLE:
+            logger.warning("Browser mode requested but playwright not available, falling back to direct")
         
         ScraperClass = get_scraper_class(request.scraper_type)
         
-        # NOTE: Removed automatic fallback logic as requested by user.
-        # We rely on the configured proxy and scraper settings.
-             
-        # Assuming ScraperClass follows the BaseScraper interface or compatible signature
-        # We pass headless from request, default to True if not specified in request (model default)
-        with ScraperClass(headless=request.headless, proxy=proxy_url, antidetect=antidetect) as scraper:
-            # IP Verification happens inside scraper if configured
-            # Pass take_screenshot flag
+        # Pass proxy config to scraper
+        with ScraperClass(headless=request.headless, proxy=proxy_url, antidetect=antidetect, proxy_config=proxy_config) as scraper:
             result = await scraper.scrape(request.query, take_screenshot=request.take_screenshot)
             
             # Enrich/Normalize metadata
@@ -595,7 +734,7 @@ async def run_scrape(request: ScrapeRequest):
                 # Handle dataclass result (legacy GoogleAIScraper)
                 result_dict = {
                     "status": "success" if getattr(result, "success", True) else "failed",
-                    "data": [asdict(d) for d in getattr(result, "sources", [])], # .sources for legacy
+                    "data": [asdict(d) for d in getattr(result, "sources", [])],
                     "response_text": getattr(result, "response_text", ""),
                     "html_content": getattr(result, "html_content", ""),
                     "error": getattr(result, "error", None),
@@ -610,6 +749,23 @@ async def run_scrape(request: ScrapeRequest):
             # Ensure metadata exists
             if "metadata" not in result_dict:
                 result_dict["metadata"] = {}
+            
+            # Add proxy layer info
+            result_dict["metadata"]["proxy_layer"] = {
+                "layer1_vpn": {
+                    "country": proxy_config.country.upper(),
+                    "proxy_url": proxy_config.vpn_proxy_url,
+                },
+                "layer2_mode": layer2_mode,
+                "active_proxy": proxy_url,
+                "origin": {
+                    "ip": proxy_config.origin_ip,
+                    "city": proxy_config.origin_city,
+                    "country": proxy_config.origin_country,
+                    "verified": proxy_config.origin_verified,
+                    "warning": proxy_config.origin_warning,
+                },
+            }
 
             # Add anti-detect metadata if active
             if antidetect and antidetect.is_active:
@@ -662,6 +818,303 @@ async def get_profiles():
             "error": "Scraping Browser not available (playwright not installed)",
             "profiles": {},
             "cost_info": {}
+        }
+
+
+@app.get(
+    "/proxies",
+    tags=["config"],
+    summary="Get all proxy configurations",
+    description="""
+    Returns detailed proxy configuration for all supported countries.
+    
+    For each country, provides:
+    - VPN Direct proxy URL (datacenter IP via ProtonVPN)
+    - Residential proxy URL (VPN + Bright Data chain)
+    - External ports for host access
+    - Internal Docker network URLs
+    """,
+    response_description="Proxy configurations by country",
+)
+async def get_proxies():
+    """
+    Get all proxy configurations with detailed information.
+    
+    Returns proxy URLs for both internal Docker network access and
+    external host access for each supported country.
+    """
+    proxy_configs = get_all_proxy_configs()
+    
+    detailed = {}
+    port_base = {
+        'fr': 1, 'de': 2, 'nl': 3, 'it': 4, 
+        'es': 5, 'uk': 6, 'ch': 7, 'se': 8
+    }
+    
+    for cc in proxy_configs['supported_countries']:
+        base = port_base.get(cc, 0)
+        detailed[cc] = {
+            "country_name": {
+                'fr': 'France', 'de': 'Germany', 'nl': 'Netherlands', 'it': 'Italy',
+                'es': 'Spain', 'uk': 'United Kingdom', 'ch': 'Switzerland', 'se': 'Sweden'
+            }.get(cc, cc.upper()),
+            "datacenter": {
+                "internal": proxy_configs['datacenter'].get(cc),
+                "external": f"http://localhost:{8000 + base}",
+                "description": "VPN direct (ProtonVPN datacenter IP)"
+            },
+            "residential": {
+                "internal": proxy_configs['residential'].get(cc),
+                "external": f"http://localhost:{8100 + base}",
+                "description": "VPN + Bright Data residential chain"
+            },
+            "control_port": 9000 + base,
+        }
+    
+    return {
+        "proxies": detailed,
+        "usage": {
+            "internal": "Use internal URLs when calling from Docker containers",
+            "external": "Use external URLs when calling from host machine",
+            "residential": "Use residential for sites that block datacenter IPs",
+            "scraping_browser": "Use scraping_browser for Google/sites with CAPTCHA"
+        }
+    }
+
+
+@app.get(
+    "/layers",
+    tags=["config"],
+    summary="Get proxy layer information",
+    description="""
+    Returns information about the two-layer proxy system.
+    
+    ## Layer 1: VPN (Always Active)
+    All traffic routes through ProtonVPN first for the selected country.
+    
+    ## Layer 2: Enhancement Mode (Optional)
+    Applied on top of VPN for additional protection:
+    - **direct**: VPN only (free)
+    - **residential**: VPN + Bright Data residential IPs (~$8.40/GB)
+    - **unlocker**: Bright Data Web Unlocker API (~$3-10/1000 req)
+    - **browser**: Bright Data Scraping Browser (~$0.01-0.03/req)
+    """,
+)
+async def get_layers():
+    """Get information about proxy layers."""
+    try:
+        from src.proxy.layers import LAYER2_INFO, Layer2Mode, SUPPORTED_COUNTRIES
+        
+        layer2_modes = {}
+        for mode in Layer2Mode:
+            info = LAYER2_INFO.get(mode, {})
+            layer2_modes[mode.value] = {
+                "name": info.get("name"),
+                "description": info.get("description"),
+                "cost": info.get("cost"),
+                "best_for": info.get("best_for", []),
+                "success_rate": info.get("success_rate", 0),
+            }
+        
+        return {
+            "layer1": {
+                "name": "VPN",
+                "description": "ProtonVPN - always active for selected country",
+                "countries": list(SUPPORTED_COUNTRIES.keys()),
+            },
+            "layer2_modes": layer2_modes,
+            "auto_selection": {
+                "google": "unlocker",
+                "chatgpt": "browser",
+                "perplexity": "browser",
+                "generic": "direct",
+            },
+        }
+    except ImportError:
+        return {"error": "Proxy layers module not available"}
+
+
+@app.get(
+    "/source-checklist",
+    tags=["config"],
+    summary="Get supported modes for each source type",
+    description="Returns which Layer 2 modes work for each scraper/source type.",
+)
+async def get_source_checklist():
+    """Get checklist of supported modes for each source type."""
+    try:
+        from src.proxy.smart_scraper import get_source_checklist
+        return get_source_checklist()
+    except ImportError:
+        return {
+            "google_ai": {"browser": True, "unlocker": True, "notes": "Requires CAPTCHA bypass"},
+            "perplexity": {"browser": True, "notes": "Requires browser automation"},
+            "chatgpt": {"browser": True, "notes": "Requires browser automation"},
+        }
+
+
+@app.post(
+    "/smart-scrape",
+    tags=["scraping"],
+    summary="Smart scrape with VPN-first routing",
+    description="""
+    Scrape a URL with automatic layer selection.
+    
+    **Layer 1 (VPN)**: Always routes through ProtonVPN for selected country
+    **Layer 2 (Enhancement)**: Auto-selected based on URL, or specify manually
+    
+    ## Layer 2 Modes
+    - `direct`: VPN only (free, fastest)
+    - `residential`: VPN + residential IPs (for sites blocking datacenter)
+    - `unlocker`: Web Unlocker API (for Google, Amazon, LinkedIn)
+    - `browser`: Full browser (for ChatGPT, Perplexity)
+    
+    ## Auto-Selection
+    - Google domains → unlocker
+    - ChatGPT/Perplexity → browser
+    - Social media → residential
+    - Everything else → direct
+    """,
+)
+async def smart_scrape_endpoint(
+    url: str,
+    country: str = "it",
+    layer2: Optional[str] = None,
+    enable_fallback: bool = True,
+):
+    """
+    Smart scrape with VPN-first routing.
+    
+    Args:
+        url: Target URL to scrape
+        country: Country code (fr, de, nl, it, es, uk, ch, se)
+        layer2: Layer 2 mode (direct, residential, unlocker, browser) or None for auto
+        enable_fallback: Enable fallback to more expensive modes on failure
+    """
+    try:
+        from src.proxy.smart_scraper import SmartScraper
+        from dataclasses import asdict
+        
+        scraper = SmartScraper(
+            country=country,
+            enable_fallback=enable_fallback,
+            verify_origin=True,
+        )
+        
+        result = await scraper.scrape(url, layer2=layer2)
+        
+        # Build response
+        response = {
+            "success": result.success,
+            "url": result.url,
+            "content_length": len(result.content) if result.content else 0,
+            
+            # Layer info
+            "layer1_vpn": {
+                "country": result.country.upper(),
+                "proxy": f"http://vpn-{result.country}:8888",
+            },
+            "layer2_mode": result.layer2_mode,
+            
+            # Origin verification
+            "origin": {
+                "ip": result.origin_ip,
+                "city": result.origin_city,
+                "country": result.origin_country,
+                "verified": result.origin_verified,
+                "warning": result.origin_warning,
+            },
+            
+            # Performance
+            "performance": {
+                "duration_seconds": result.duration_seconds,
+                "data_kb": result.data_kb,
+                "estimated_cost_usd": result.estimated_cost_usd,
+                "attempts": result.attempts,
+                "fallback_used": result.fallback_used,
+            },
+            
+            "error": result.error,
+        }
+        
+        # Include content if not too large
+        if result.content and len(result.content) < 100000:
+            response["content"] = result.content
+        elif result.content:
+            response["content"] = result.content[:100000] + "...[truncated]"
+        else:
+            response["content"] = ""
+        
+        return response
+        
+    except ImportError as e:
+        raise HTTPException(status_code=500, detail=f"Smart scraper not available: {e}")
+    except Exception as e:
+        logger.exception("Error during smart scrape")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post(
+    "/unlock",
+    tags=["scraping"],
+    summary="Web Unlocker API (for protected sites)",
+    description="""
+    Fetch a URL using Bright Data's Web Unlocker API.
+    
+    Best for: Google, Amazon, LinkedIn, and other protected sites.
+    
+    **Note**: This bypasses VPN and goes directly to Bright Data.
+    Use /smart-scrape with layer2='unlocker' to route through VPN first.
+    """,
+)
+async def unlock_url(
+    url: str,
+    country: str = "us",
+):
+    """Unlock a URL using Web Unlocker API."""
+    try:
+        from src.proxy.unlocker import WebUnlockerClient
+        
+        client = WebUnlockerClient(default_country=country)
+        response = await client.unlock(url=url, country=country)
+        
+        return {
+            "success": response.success,
+            "status_code": response.status_code,
+            "content": response.content[:100000] if response.content else "",
+            "content_length": len(response.content) if response.content else 0,
+            "country": response.country_used,
+            "is_premium_domain": response.is_premium,
+            "estimated_cost_usd": response.estimated_cost_usd,
+            "error": response.error,
+        }
+        
+    except ImportError:
+        raise HTTPException(status_code=500, detail="Web Unlocker not available")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get(
+    "/api-reference",
+    tags=["config"],
+    summary="Get API reference with examples",
+    description="Returns list of all supported API calls with examples.",
+)
+async def get_api_reference():
+    """Get API reference with valid call examples."""
+    try:
+        from src.proxy.smart_scraper import get_supported_calls
+        return {
+            "calls": get_supported_calls(),
+            "countries": ["fr", "de", "nl", "it", "es", "uk", "ch", "se"],
+            "layer2_modes": ["direct", "residential", "unlocker", "browser"],
+            "scraper_types": ["google_ai", "perplexity", "chatgpt"],
+        }
+    except ImportError:
+        return {
+            "calls": [],
+            "countries": ["fr", "de", "nl", "it", "es", "uk", "ch", "se"],
         }
 
 

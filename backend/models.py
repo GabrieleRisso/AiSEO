@@ -74,7 +74,7 @@ class ScrapeJob(SQLModel, table=True):
     query: str
     country: str
     scraper_type: str = "google_ai"
-    status: str = "pending"  # pending, running, completed, failed
+    status: str = "pending"  # pending, running, completed, failed, scheduled
     created_at: datetime = Field(default_factory=datetime.utcnow)
     completed_at: datetime | None = None
     error: str | None = None
@@ -86,8 +86,74 @@ class ScrapeJob(SQLModel, table=True):
     
     # Scheduling fields
     schedule_type: str = "once" # once, recurring
-    frequency: str | None = None # daily, weekly, monthly
+    frequency: str | None = None # daily, weekly, monthly, 2_per_day, etc.
     next_run_at: datetime | None = None
     is_active: bool = True
     parent_job_id: int | None = Field(default=None, foreign_key="scrapejob.id")
+    
+    # Performance tracking
+    duration_seconds: float | None = None  # Time to complete
+    response_size_kb: float | None = None  # Response size in KB
+    
+    # Cost tracking  
+    layer2_mode: str | None = None  # direct, residential, unlocker, browser
+    estimated_cost_usd: float | None = None  # Estimated cost for this job
+    
+    # Origin verification
+    origin_ip: str | None = None
+    origin_country: str | None = None
+    origin_verified: bool = False
+
+
+class DailyStats(SQLModel, table=True):
+    """Daily statistics for quota and monitoring"""
+    id: int | None = Field(default=None, primary_key=True)
+    date: str = Field(unique=True)  # YYYY-MM-DD format
+    
+    # Prompt counts
+    prompts_scheduled: int = 0
+    prompts_completed: int = 0
+    prompts_failed: int = 0
+    
+    # Job counts by scraper type
+    jobs_google_ai: int = 0
+    jobs_chatgpt: int = 0
+    jobs_perplexity: int = 0
+    
+    # Cost tracking by layer
+    cost_vpn_direct: float = 0.0  # Free
+    cost_residential: float = 0.0  # ~$8.40/GB
+    cost_unlocker: float = 0.0  # ~$3-10/1000 req
+    cost_browser: float = 0.0  # ~$0.01-0.03/req
+    total_cost_usd: float = 0.0
+    
+    # Performance
+    avg_duration_seconds: float = 0.0
+    total_data_kb: float = 0.0
+    
+    # Quota
+    daily_quota: int = 100  # Default daily limit
+    quota_remaining: int = 100
+    
+    # Timestamps
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class PromptTemplate(SQLModel, table=True):
+    """Reusable prompt templates for batch scheduling"""
+    id: int | None = Field(default=None, primary_key=True)
+    name: str  # Template name
+    query: str  # The actual query/prompt
+    category: str | None = None  # e.g., "seo", "competitor", "brand"
+    countries: str = "it,ch,uk"  # Comma-separated country codes
+    scraper_type: str = "google_ai"
+    frequency: str = "1_per_day"  # How often to run
+    is_active: bool = True
+    priority: int = 1  # 1=high, 2=medium, 3=low
+    
+    # Cost optimization
+    preferred_layer2: str = "auto"  # auto, direct, residential, unlocker, browser
+    
+    created_at: datetime = Field(default_factory=datetime.utcnow)
 

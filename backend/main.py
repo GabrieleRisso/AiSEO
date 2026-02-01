@@ -1,4 +1,5 @@
 import os
+from typing import List
 from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session, select, func
@@ -10,7 +11,8 @@ import json
 from pydantic import BaseModel, Field
 
 from database import create_db_and_tables, get_session, engine
-from models import Brand, Prompt, PromptBrandMention, Source, PromptSource, ScrapeJob
+from models import Brand, Prompt, PromptBrandMention, Source, PromptSource, ScrapeJob, DailyStats, PromptTemplate
+from admin import setup_admin
 from schemas import (
     BrandResponse,
     PromptResponse,
@@ -101,6 +103,17 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Session middleware required for SQLAdmin authentication
+from starlette.middleware.sessions import SessionMiddleware
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=os.getenv("SECRET_KEY", "change-me-in-production-secret-key")
+)
+
+# Setup SQLAdmin database viewer at /admin
+# Access the UI at http://localhost:8000/admin
+setup_admin(app, engine)
 
 
 @app.on_event("startup")
@@ -1732,19 +1745,38 @@ async def scheduler_loop():
         await asyncio.sleep(60) # Check every minute
 
 def update_next_run(job: ScrapeJob):
-    """Calculate next run time based on frequency."""
+    """
+    Calculate next run time based on frequency.
+    
+    Supported frequencies:
+    - hourly: Every hour
+    - 2_per_day: Every 12 hours
+    - 1_per_day / daily: Every 24 hours
+    - 2_per_week: Every 3.5 days
+    - weekly: Every 7 days
+    - monthly: Every 30 days
+    """
     if not job.next_run_at:
         job.next_run_at = datetime.utcnow()
-        
-    if job.frequency == "daily":
-        job.next_run_at += timedelta(days=1)
-    elif job.frequency == "weekly":
-        job.next_run_at += timedelta(weeks=1)
-    elif job.frequency == "hourly":
-        job.next_run_at += timedelta(hours=1)
-    else:
-        # Default fallback
-        job.next_run_at += timedelta(days=1)
+    
+    freq = job.frequency.lower() if job.frequency else "daily"
+    
+    # Map frequency to timedelta
+    frequency_map = {
+        "hourly": timedelta(hours=1),
+        "2_per_day": timedelta(hours=12),
+        "1_per_day": timedelta(days=1),
+        "daily": timedelta(days=1),
+        "2_per_week": timedelta(days=3, hours=12),  # ~3.5 days
+        "1_per_week": timedelta(weeks=1),
+        "weekly": timedelta(weeks=1),
+        "monthly": timedelta(days=30),
+    }
+    
+    delta = frequency_map.get(freq, timedelta(days=1))
+    job.next_run_at += delta
+    
+    print(f"[Scheduler] Job {job.id} next run: {job.next_run_at} (frequency: {freq})")
 
 async def trigger_scheduled_job(parent_job: ScrapeJob, session: Session):
     """Create and trigger a new job instance from a parent scheduled job."""
@@ -2140,8 +2172,20 @@ class JobRequest(BaseModel):
     browser_type: str = Field(default="chrome", description="Browser type: chrome, firefox, safari", example="chrome")
     human_behavior: bool = Field(default=True, description="Enable human-like behavior (typing, mouse movements)", example=True)
     
-    # Scheduling
-    frequency: str | None = Field(default=None, description="Schedule frequency: daily, weekly, hourly. None for one-time job", example=None)
+    # Scheduling - supported frequencies
+    frequency: str | None = Field(
+        default=None, 
+        description="""Schedule frequency. Options:
+        - None: One-time job (no repeat)
+        - 'hourly': Every hour
+        - '2_per_day': Every 12 hours
+        - '1_per_day' or 'daily': Every 24 hours
+        - '2_per_week': Every 3.5 days
+        - '1_per_week' or 'weekly': Every 7 days
+        - 'monthly': Every 30 days
+        """,
+        example="1_per_day"
+    )
     start_date: datetime | None = Field(default=None, description="Start date for scheduled jobs (ISO format). Defaults to now if not provided", example=None)
     
     # Debugging
@@ -2321,6 +2365,57 @@ async def run_scrape_logic_background(job_id: int, config: dict):
     await run_scrape_logic(job_id, config)
 
 @app.get(
+    "/api/jobs/{job_id}",
+    tags=["jobs"],
+    summary="Get job details",
+    description="Get detailed information about a specific scrape job including HTML snapshot.",
+)
+def get_job(job_id: int):
+    """Get details for a specific scrape job."""
+    with Session(engine) as session:
+        job = session.get(ScrapeJob, job_id)
+        if not job:
+            raise HTTPException(status_code=404, detail="Job not found")
+        return {
+            "id": job.id,
+            "query": job.query,
+            "country": job.country,
+            "scraper_type": job.scraper_type,
+            "status": job.status,
+            "created_at": job.created_at,
+            "completed_at": job.completed_at,
+            "error": job.error,
+            "proxy_used": job.proxy_used,
+            "profile_data": json.loads(job.profile_data) if job.profile_data else None,
+            "config_snapshot": json.loads(job.config_snapshot) if job.config_snapshot else None,
+            "html_snapshot_size": len(job.html_snapshot) if job.html_snapshot else 0,
+            "prompt_id": job.prompt_id,
+            "schedule_type": job.schedule_type,
+            "frequency": job.frequency,
+            "next_run_at": job.next_run_at,
+            "is_active": job.is_active,
+        }
+
+
+@app.get(
+    "/api/jobs/{job_id}/html",
+    tags=["jobs"],
+    summary="Get job HTML snapshot",
+    description="Get the raw HTML snapshot captured during scraping. Returns HTML content directly.",
+)
+def get_job_html(job_id: int):
+    """Get HTML snapshot for a scrape job."""
+    from fastapi.responses import HTMLResponse
+    with Session(engine) as session:
+        job = session.get(ScrapeJob, job_id)
+        if not job:
+            raise HTTPException(status_code=404, detail="Job not found")
+        if not job.html_snapshot:
+            raise HTTPException(status_code=404, detail="No HTML snapshot available for this job")
+        return HTMLResponse(content=job.html_snapshot, media_type="text/html")
+
+
+@app.get(
     "/api/jobs",
     tags=["jobs"],
     summary="List scraping jobs",
@@ -2384,9 +2479,1107 @@ def list_jobs(status: str | None = None):
                 "status": job.status,
                 "country": job.country,
                 "frequency": job.frequency,
-                "next_run_at": job.next_run_at,
-                "created_at": job.created_at,
-                "scraper_type": job.scraper_type
+                "next_run_at": job.next_run_at.isoformat() if job.next_run_at else None,
+                "created_at": job.created_at.isoformat() if job.created_at else None,
+                "scraper_type": job.scraper_type,
+                "is_active": job.is_active,
             }
             for job in jobs
         ]
+
+
+@app.get(
+    "/api/scheduled-jobs",
+    tags=["jobs"],
+    summary="List scheduled/recurring jobs",
+    description="""
+    List all active scheduled jobs that will run periodically.
+    
+    **Supported Frequencies:**
+    - `hourly`: Every hour
+    - `2_per_day`: Every 12 hours
+    - `1_per_day` / `daily`: Every 24 hours
+    - `2_per_week`: Every 3.5 days
+    - `weekly`: Every 7 days
+    - `monthly`: Every 30 days
+    """,
+)
+def list_scheduled_jobs():
+    """List all active scheduled jobs."""
+    with Session(engine) as session:
+        jobs = session.exec(
+            select(ScrapeJob).where(
+                ScrapeJob.is_active == True,
+                ScrapeJob.frequency != None
+            ).order_by(ScrapeJob.next_run_at)
+        ).all()
+        
+        now = datetime.utcnow()
+        
+        return {
+            "scheduled_jobs": [
+                {
+                    "id": job.id,
+                    "query": job.query,
+                    "country": job.country,
+                    "scraper_type": job.scraper_type,
+                    "frequency": job.frequency,
+                    "next_run_at": job.next_run_at.isoformat() if job.next_run_at else None,
+                    "time_until_next_run": str(job.next_run_at - now) if job.next_run_at and job.next_run_at > now else "Due now",
+                    "is_active": job.is_active,
+                }
+                for job in jobs
+            ],
+            "total_scheduled": len(jobs),
+            "current_time": now.isoformat(),
+            "supported_frequencies": [
+                "hourly", "2_per_day", "1_per_day", "daily", 
+                "2_per_week", "1_per_week", "weekly", "monthly"
+            ],
+        }
+
+
+@app.get(
+    "/api/scheduler-status",
+    tags=["system"],
+    summary="Get scheduler status",
+    description="Check if the background scheduler is running and view upcoming jobs.",
+)
+def get_scheduler_status():
+    """Get scheduler status and upcoming jobs."""
+    with Session(engine) as session:
+        now = datetime.utcnow()
+        
+        # Get jobs due in the next hour
+        upcoming = session.exec(
+            select(ScrapeJob).where(
+                ScrapeJob.is_active == True,
+                ScrapeJob.frequency != None,
+                ScrapeJob.next_run_at <= now + timedelta(hours=1)
+            ).order_by(ScrapeJob.next_run_at)
+        ).all()
+        
+        # Get total active scheduled jobs
+        total_active = session.exec(
+            select(func.count(ScrapeJob.id)).where(
+                ScrapeJob.is_active == True,
+                ScrapeJob.frequency != None
+            )
+        ).one()
+        
+        # Get jobs that ran in the last hour
+        recent = session.exec(
+            select(ScrapeJob).where(
+                ScrapeJob.completed_at >= now - timedelta(hours=1),
+                ScrapeJob.parent_job_id != None  # Only scheduled runs
+            ).order_by(ScrapeJob.completed_at.desc())
+        ).all()
+        
+        return {
+            "status": "running",
+            "current_time": now.isoformat(),
+            "total_scheduled_jobs": total_active,
+            "jobs_due_next_hour": [
+                {
+                    "id": job.id,
+                    "query": job.query[:50],
+                    "frequency": job.frequency,
+                    "next_run_at": job.next_run_at.isoformat() if job.next_run_at else None,
+                }
+                for job in upcoming
+            ],
+            "recent_runs_last_hour": [
+                {
+                    "id": job.id,
+                    "query": job.query[:50],
+                    "status": job.status,
+                    "completed_at": job.completed_at.isoformat() if job.completed_at else None,
+                }
+                for job in recent[:10]
+            ],
+            "scheduler_info": {
+                "check_interval": "60 seconds",
+                "supported_frequencies": [
+                    {"name": "hourly", "interval": "1 hour"},
+                    {"name": "2_per_day", "interval": "12 hours"},
+                    {"name": "1_per_day", "interval": "24 hours"},
+                    {"name": "daily", "interval": "24 hours"},
+                    {"name": "2_per_week", "interval": "3.5 days"},
+                    {"name": "weekly", "interval": "7 days"},
+                    {"name": "monthly", "interval": "30 days"},
+                ],
+            },
+        }
+
+
+# =============================================================================
+# DAILY STATISTICS & MONITORING
+# =============================================================================
+
+def get_or_create_daily_stats(session: Session, date_str: str = None) -> DailyStats:
+    """Get or create daily stats for a given date."""
+    if not date_str:
+        date_str = datetime.utcnow().strftime("%Y-%m-%d")
+    
+    stats = session.exec(
+        select(DailyStats).where(DailyStats.date == date_str)
+    ).first()
+    
+    if not stats:
+        stats = DailyStats(date=date_str)
+        session.add(stats)
+        session.commit()
+        session.refresh(stats)
+    
+    return stats
+
+
+def update_daily_stats_from_job(session: Session, job: ScrapeJob):
+    """Update daily stats when a job completes."""
+    date_str = job.completed_at.strftime("%Y-%m-%d") if job.completed_at else datetime.utcnow().strftime("%Y-%m-%d")
+    stats = get_or_create_daily_stats(session, date_str)
+    
+    if job.status == "completed":
+        stats.prompts_completed += 1
+        
+        # Update by scraper type
+        if job.scraper_type == "google_ai":
+            stats.jobs_google_ai += 1
+        elif job.scraper_type == "chatgpt":
+            stats.jobs_chatgpt += 1
+        elif job.scraper_type == "perplexity":
+            stats.jobs_perplexity += 1
+        
+        # Update cost by layer
+        if job.layer2_mode:
+            cost = job.estimated_cost_usd or 0
+            if job.layer2_mode == "direct":
+                stats.cost_vpn_direct += cost
+            elif job.layer2_mode == "residential":
+                stats.cost_residential += cost
+            elif job.layer2_mode == "unlocker":
+                stats.cost_unlocker += cost
+            elif job.layer2_mode == "browser":
+                stats.cost_browser += cost
+            stats.total_cost_usd += cost
+        
+        # Update performance
+        if job.duration_seconds:
+            # Running average
+            total_jobs = stats.prompts_completed
+            stats.avg_duration_seconds = (
+                (stats.avg_duration_seconds * (total_jobs - 1) + job.duration_seconds) / total_jobs
+            )
+        
+        if job.response_size_kb:
+            stats.total_data_kb += job.response_size_kb
+            
+    elif job.status == "failed":
+        stats.prompts_failed += 1
+    
+    stats.quota_remaining = max(0, stats.daily_quota - stats.prompts_completed - stats.prompts_scheduled)
+    stats.updated_at = datetime.utcnow()
+    
+    session.add(stats)
+    session.commit()
+
+
+@app.get(
+    "/api/daily-stats",
+    tags=["analytics"],
+    summary="Get daily statistics",
+    description="""
+    Get statistics for today or a specific date.
+    
+    Includes:
+    - Prompt counts (scheduled, completed, failed)
+    - Jobs by scraper type
+    - Cost breakdown by proxy layer
+    - Performance metrics
+    - Quota status
+    """,
+)
+def get_daily_stats(date: str = None):
+    """Get daily statistics for monitoring."""
+    with Session(engine) as session:
+        if not date:
+            date = datetime.utcnow().strftime("%Y-%m-%d")
+        
+        stats = get_or_create_daily_stats(session, date)
+        
+        # Also get real-time counts from jobs
+        today_start = datetime.strptime(date, "%Y-%m-%d")
+        today_end = today_start + timedelta(days=1)
+        
+        # Count actual jobs for today
+        jobs_today = session.exec(
+            select(ScrapeJob).where(
+                ScrapeJob.created_at >= today_start,
+                ScrapeJob.created_at < today_end
+            )
+        ).all()
+        
+        completed = sum(1 for j in jobs_today if j.status == "completed")
+        failed = sum(1 for j in jobs_today if j.status == "failed")
+        running = sum(1 for j in jobs_today if j.status == "running")
+        pending = sum(1 for j in jobs_today if j.status in ("pending", "scheduled"))
+        
+        # Get active sessions (running jobs)
+        active_sessions = session.exec(
+            select(ScrapeJob).where(ScrapeJob.status == "running")
+        ).all()
+        
+        return {
+            "date": date,
+            "summary": {
+                "total_jobs": len(jobs_today),
+                "completed": completed,
+                "failed": failed,
+                "running": running,
+                "pending": pending,
+                "success_rate": round(completed / len(jobs_today) * 100, 1) if jobs_today else 0,
+            },
+            "quota": {
+                "daily_limit": stats.daily_quota,
+                "used": completed + running + pending,
+                "remaining": max(0, stats.daily_quota - completed - running - pending),
+                "percentage_used": round((completed + running + pending) / stats.daily_quota * 100, 1),
+            },
+            "by_scraper": {
+                "google_ai": sum(1 for j in jobs_today if j.scraper_type == "google_ai"),
+                "chatgpt": sum(1 for j in jobs_today if j.scraper_type == "chatgpt"),
+                "perplexity": sum(1 for j in jobs_today if j.scraper_type == "perplexity"),
+            },
+            "by_country": {
+                country: sum(1 for j in jobs_today if j.country == country)
+                for country in set(j.country for j in jobs_today)
+            },
+            "costs": {
+                "vpn_direct": stats.cost_vpn_direct,
+                "residential": stats.cost_residential,
+                "unlocker": stats.cost_unlocker,
+                "browser": stats.cost_browser,
+                "total_usd": stats.total_cost_usd,
+            },
+            "performance": {
+                "avg_duration_seconds": round(stats.avg_duration_seconds, 2),
+                "total_data_kb": round(stats.total_data_kb, 2),
+            },
+            "active_sessions": [
+                {
+                    "id": j.id,
+                    "query": j.query[:50],
+                    "country": j.country,
+                    "scraper_type": j.scraper_type,
+                    "started_at": j.created_at.isoformat(),
+                    "running_for_seconds": (datetime.utcnow() - j.created_at).total_seconds(),
+                }
+                for j in active_sessions
+            ],
+        }
+
+
+@app.get(
+    "/api/active-sessions",
+    tags=["analytics"],
+    summary="Get active scraping sessions",
+    description="Get all currently running scraping sessions with real-time status.",
+)
+def get_active_sessions():
+    """Get all active scraping sessions."""
+    with Session(engine) as session:
+        active = session.exec(
+            select(ScrapeJob).where(ScrapeJob.status == "running")
+        ).all()
+        
+        return {
+            "count": len(active),
+            "sessions": [
+                {
+                    "id": j.id,
+                    "query": j.query,
+                    "country": j.country,
+                    "scraper_type": j.scraper_type,
+                    "layer2_mode": j.layer2_mode,
+                    "started_at": j.created_at.isoformat(),
+                    "running_for_seconds": round((datetime.utcnow() - j.created_at).total_seconds(), 1),
+                    "parent_job_id": j.parent_job_id,
+                }
+                for j in active
+            ],
+        }
+
+
+@app.get(
+    "/api/job-history",
+    tags=["analytics"],
+    summary="Get job execution history",
+    description="Get recent job history with timing and performance data.",
+)
+def get_job_history(
+    limit: int = 50,
+    status: str = None,
+    scraper_type: str = None,
+    country: str = None,
+):
+    """Get job execution history with filters."""
+    with Session(engine) as session:
+        query = select(ScrapeJob).order_by(ScrapeJob.created_at.desc())
+        
+        if status:
+            query = query.where(ScrapeJob.status == status)
+        if scraper_type:
+            query = query.where(ScrapeJob.scraper_type == scraper_type)
+        if country:
+            query = query.where(ScrapeJob.country == country)
+        
+        query = query.limit(limit)
+        jobs = session.exec(query).all()
+        
+        return {
+            "count": len(jobs),
+            "jobs": [
+                {
+                    "id": j.id,
+                    "query": j.query[:80],
+                    "country": j.country,
+                    "scraper_type": j.scraper_type,
+                    "status": j.status,
+                    "layer2_mode": j.layer2_mode,
+                    "created_at": j.created_at.isoformat(),
+                    "completed_at": j.completed_at.isoformat() if j.completed_at else None,
+                    "duration_seconds": j.duration_seconds,
+                    "response_size_kb": j.response_size_kb,
+                    "estimated_cost_usd": j.estimated_cost_usd,
+                    "origin_ip": j.origin_ip,
+                    "origin_country": j.origin_country,
+                    "origin_verified": j.origin_verified,
+                    "error": j.error[:100] if j.error else None,
+                }
+                for j in jobs
+            ],
+        }
+
+
+# =============================================================================
+# PROMPT TEMPLATES & BATCH SCHEDULING
+# =============================================================================
+
+# Supported countries with VPN containers
+SUPPORTED_VPN_COUNTRIES = ["it", "ch", "uk", "de", "fr", "es", "nl", "us"]
+
+class PromptTemplateCreate(BaseModel):
+    """Request model for creating prompt templates.
+    
+    Each query will be executed in EACH specified country using that country's
+    VPN container (Layer 1). The origin IP will be verified and tracked.
+    
+    Example: If countries="it,ch,uk", the query will run 3 times - once through
+    each country's VPN, giving you geo-specific results.
+    """
+    name: str = Field(
+        ..., 
+        description="Template name for identification",
+        example="SEO Tools Query"
+    )
+    query: str = Field(
+        ..., 
+        description="The search query to execute",
+        example="best seo tools 2026"
+    )
+    category: str = Field(
+        default="general", 
+        description="Category for organizing templates",
+        example="seo"
+    )
+    countries: str = Field(
+        default="it,ch,uk", 
+        description=f"""Comma-separated country codes. Each query runs in EACH country's VPN.
+        
+Supported countries: {', '.join(SUPPORTED_VPN_COUNTRIES)}
+
+Example: "it,ch,uk" = 3 separate jobs, one per country VPN.
+The job will route: Client → VPN-{'{country}'} → Layer2 → Target""",
+        example="it,ch,uk"
+    )
+    scraper_type: str = Field(
+        default="google_ai", 
+        description="""Scraper type to use.
+        
+Options:
+- google_ai: Google AI Mode (recommended: unlocker layer)
+- chatgpt: ChatGPT (recommended: browser layer)
+- perplexity: Perplexity AI (recommended: browser layer)""",
+        example="google_ai"
+    )
+    frequency: str = Field(
+        default="1_per_day", 
+        description="""How often to run this query.
+        
+Options:
+- hourly: Every 1 hour (24 runs/day)
+- 2_per_day: Every 12 hours (2 runs/day)
+- 1_per_day: Every 24 hours (1 run/day)
+- daily: Same as 1_per_day
+- 2_per_week: Every 3.5 days
+- weekly: Every 7 days
+- monthly: Every 30 days""",
+        example="1_per_day"
+    )
+    priority: int = Field(
+        default=1, 
+        description="Priority level: 1=high (run first), 2=medium, 3=low",
+        ge=1, le=3
+    )
+    preferred_layer2: str = Field(
+        default="auto", 
+        description="""Layer 2 proxy mode (on top of VPN).
+        
+Options:
+- auto: Automatically select based on scraper_type
+- direct: VPN only (free, ~70% success)
+- residential: VPN + Bright Data residential IP (~$0.004/req, ~85% success)
+- unlocker: VPN + Web Unlocker with CAPTCHA solving (~$0.008/req, ~95% success)
+- browser: VPN + Cloud browser automation (~$0.025/req, ~98% success)
+
+Recommendations:
+- google_ai → unlocker
+- chatgpt → browser
+- perplexity → browser""",
+        example="unlocker"
+    )
+
+
+@app.post(
+    "/api/templates",
+    tags=["scheduling"],
+    summary="Create prompt template",
+    description="""Create a reusable prompt template for scheduled scraping.
+
+## How Country Routing Works
+
+Each query is executed separately in EACH specified country:
+
+```
+Template: "best seo tools" with countries="it,ch,uk"
+
+Creates 3 jobs:
+1. Job IT: Client → VPN-IT (Italy IP) → Layer2 → Google
+2. Job CH: Client → VPN-CH (Swiss IP) → Layer2 → Google  
+3. Job UK: Client → VPN-UK (UK IP) → Layer2 → Google
+```
+
+## Tracking
+
+Each job tracks:
+- `country`: Target country code
+- `origin_ip`: Actual IP used (verified)
+- `origin_country`: Actual country of IP
+- `origin_verified`: True if IP matches target country
+- `layer2_mode`: Which proxy layer was used
+- `duration_seconds`: Execution time
+- `estimated_cost_usd`: Cost estimate
+
+## Example Request
+
+```json
+{
+  "name": "SEO Competition",
+  "query": "best e-commerce platform comparison",
+  "countries": "it,ch,uk",
+  "scraper_type": "google_ai",
+  "frequency": "1_per_day",
+  "preferred_layer2": "unlocker"
+}
+```
+
+This creates a template that will:
+- Run the query once per day
+- Execute in Italy, Switzerland, and UK (3 jobs)
+- Use Web Unlocker for reliable Google scraping
+- Track origin IPs to verify geo-targeting
+""",
+)
+def create_template(template: PromptTemplateCreate):
+    """Create a new prompt template."""
+    # Validate countries
+    requested_countries = [c.strip().lower() for c in template.countries.split(",")]
+    invalid_countries = [c for c in requested_countries if c not in SUPPORTED_VPN_COUNTRIES]
+    
+    if invalid_countries:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid countries: {invalid_countries}. Supported: {SUPPORTED_VPN_COUNTRIES}"
+        )
+    
+    # Validate scraper type
+    valid_scrapers = ["google_ai", "chatgpt", "perplexity"]
+    if template.scraper_type not in valid_scrapers:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid scraper_type: {template.scraper_type}. Supported: {valid_scrapers}"
+        )
+    
+    # Validate layer2 mode
+    valid_layers = ["auto", "direct", "residential", "unlocker", "browser"]
+    if template.preferred_layer2 not in valid_layers:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid preferred_layer2: {template.preferred_layer2}. Supported: {valid_layers}"
+        )
+    
+    # Validate frequency
+    valid_frequencies = ["hourly", "2_per_day", "1_per_day", "daily", "2_per_week", "weekly", "monthly"]
+    if template.frequency not in valid_frequencies:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid frequency: {template.frequency}. Supported: {valid_frequencies}"
+        )
+    
+    # Normalize countries (lowercase, no spaces)
+    normalized_countries = ",".join(requested_countries)
+    
+    with Session(engine) as session:
+        db_template = PromptTemplate(
+            name=template.name,
+            query=template.query,
+            category=template.category,
+            countries=normalized_countries,
+            scraper_type=template.scraper_type,
+            frequency=template.frequency,
+            priority=template.priority,
+            preferred_layer2=template.preferred_layer2,
+        )
+        session.add(db_template)
+        session.commit()
+        session.refresh(db_template)
+        
+        # Calculate jobs that will be created
+        jobs_per_run = len(requested_countries)
+        frequency_runs = {
+            "hourly": 24, "2_per_day": 2, "1_per_day": 1, "daily": 1,
+            "2_per_week": 0.29, "weekly": 0.14, "monthly": 0.03
+        }
+        daily_jobs = jobs_per_run * frequency_runs.get(template.frequency, 1)
+        
+        # Estimate costs
+        layer_costs = {"direct": 0, "residential": 0.004, "unlocker": 0.008, "browser": 0.025, "auto": 0.008}
+        layer2 = template.preferred_layer2
+        if layer2 == "auto":
+            layer2 = {"google_ai": "unlocker", "chatgpt": "browser", "perplexity": "browser"}.get(template.scraper_type, "direct")
+        daily_cost = daily_jobs * layer_costs.get(layer2, 0)
+        
+        return {
+            "id": db_template.id,
+            "name": db_template.name,
+            "query": db_template.query,
+            "countries": requested_countries,
+            "scraper_type": db_template.scraper_type,
+            "frequency": db_template.frequency,
+            "preferred_layer2": db_template.preferred_layer2,
+            "message": "Template created successfully",
+            "routing_info": {
+                "jobs_per_run": jobs_per_run,
+                "daily_jobs_estimate": round(daily_jobs, 1),
+                "daily_cost_estimate_usd": round(daily_cost, 3),
+                "vpn_containers": [f"vpn-{c}" for c in requested_countries],
+            },
+            "tracking_fields": [
+                "origin_ip - Actual IP used",
+                "origin_country - Actual country of IP",
+                "origin_verified - True if IP matches target",
+                "duration_seconds - Execution time",
+                "layer2_mode - Proxy layer used",
+                "estimated_cost_usd - Cost for this job",
+            ],
+        }
+
+
+@app.get(
+    "/api/templates",
+    tags=["scheduling"],
+    summary="List prompt templates",
+    description="""Get all prompt templates with routing information.
+
+Each template shows:
+- Which countries the query will run in
+- The VPN container used for each country
+- Estimated daily jobs and costs
+""",
+)
+def list_templates(active_only: bool = True):
+    """List all prompt templates."""
+    with Session(engine) as session:
+        query = select(PromptTemplate)
+        if active_only:
+            query = query.where(PromptTemplate.is_active == True)
+        
+        templates = session.exec(query.order_by(PromptTemplate.priority)).all()
+        
+        # Calculate totals
+        total_daily_jobs = 0
+        total_daily_cost = 0
+        
+        template_list = []
+        for t in templates:
+            countries = t.countries.split(",")
+            frequency_runs = {
+                "hourly": 24, "2_per_day": 2, "1_per_day": 1, "daily": 1,
+                "2_per_week": 0.29, "weekly": 0.14, "monthly": 0.03
+            }
+            layer_costs = {"direct": 0, "residential": 0.004, "unlocker": 0.008, "browser": 0.025, "auto": 0.008}
+            
+            jobs_per_run = len(countries)
+            daily_jobs = jobs_per_run * frequency_runs.get(t.frequency, 1)
+            
+            layer2 = t.preferred_layer2
+            if layer2 == "auto":
+                layer2 = {"google_ai": "unlocker", "chatgpt": "browser", "perplexity": "browser"}.get(t.scraper_type, "direct")
+            daily_cost = daily_jobs * layer_costs.get(layer2, 0)
+            
+            total_daily_jobs += daily_jobs
+            total_daily_cost += daily_cost
+            
+            template_list.append({
+                "id": t.id,
+                "name": t.name,
+                "query": t.query,
+                "category": t.category,
+                "countries": countries,
+                "scraper_type": t.scraper_type,
+                "frequency": t.frequency,
+                "priority": t.priority,
+                "preferred_layer2": t.preferred_layer2,
+                "is_active": t.is_active,
+                "routing": {
+                    "vpn_containers": [f"vpn-{c}" for c in countries],
+                    "jobs_per_run": jobs_per_run,
+                    "daily_jobs": round(daily_jobs, 1),
+                    "daily_cost_usd": round(daily_cost, 3),
+                },
+            })
+        
+        return {
+            "count": len(templates),
+            "totals": {
+                "daily_jobs": round(total_daily_jobs, 1),
+                "daily_cost_usd": round(total_daily_cost, 2),
+                "monthly_cost_usd": round(total_daily_cost * 30, 2),
+            },
+            "supported_countries": SUPPORTED_VPN_COUNTRIES,
+            "templates": template_list,
+        }
+
+
+class BatchScheduleRequest(BaseModel):
+    """Request model for batch scheduling"""
+    template_ids: list[int] = Field(default=None, description="Template IDs to schedule (None = all active)")
+    countries: list[str] = Field(default=None, description="Override countries (None = use template)")
+    start_time: datetime = Field(default=None, description="When to start (None = spread throughout day)")
+    daily_quota: int = Field(default=100, description="Maximum jobs per day")
+
+
+@app.post(
+    "/api/schedule-batch",
+    tags=["scheduling"],
+    summary="Schedule batch of prompts",
+    description="""
+    Schedule a batch of prompts from templates across multiple countries.
+    
+    Optimizes scheduling to:
+    - Spread jobs throughout the day
+    - Respect daily quota
+    - Balance across countries
+    - Minimize costs
+    
+    For 100 prompts/day across 3 countries with 3 runs each:
+    - 100 prompts ÷ 3 countries = ~33 prompts per country
+    - 33 prompts × 3 runs = ~11 unique queries per country
+    """,
+)
+def schedule_batch(request: BatchScheduleRequest):
+    """Schedule a batch of prompts."""
+    with Session(engine) as session:
+        # Get templates
+        if request.template_ids:
+            templates = session.exec(
+                select(PromptTemplate).where(
+                    PromptTemplate.id.in_(request.template_ids),
+                    PromptTemplate.is_active == True
+                )
+            ).all()
+        else:
+            templates = session.exec(
+                select(PromptTemplate).where(PromptTemplate.is_active == True)
+            ).all()
+        
+        if not templates:
+            raise HTTPException(status_code=400, detail="No active templates found")
+        
+        # Calculate schedule
+        now = datetime.utcnow()
+        today = now.strftime("%Y-%m-%d")
+        stats = get_or_create_daily_stats(session, today)
+        
+        # Check quota
+        available_quota = stats.daily_quota - stats.prompts_scheduled - stats.prompts_completed
+        if available_quota <= 0:
+            raise HTTPException(status_code=429, detail="Daily quota exceeded")
+        
+        # Build job list
+        jobs_to_create = []
+        for template in templates:
+            countries = request.countries or template.countries.split(",")
+            
+            for country in countries:
+                country = country.strip().lower()
+                
+                # Map frequency to runs per day
+                runs_map = {
+                    "hourly": 24,
+                    "2_per_day": 2,
+                    "1_per_day": 1,
+                    "daily": 1,
+                    "2_per_week": 0.29,  # ~2/week
+                    "weekly": 0.14,
+                    "monthly": 0.03,
+                }
+                runs_today = runs_map.get(template.frequency, 1)
+                
+                for run in range(int(max(1, runs_today))):
+                    if len(jobs_to_create) >= available_quota:
+                        break
+                    
+                    jobs_to_create.append({
+                        "template": template,
+                        "country": country,
+                        "run": run + 1,
+                    })
+        
+        # Spread jobs throughout the day
+        jobs_created = []
+        hours_remaining = 24 - now.hour
+        interval_minutes = (hours_remaining * 60) / len(jobs_to_create) if jobs_to_create else 60
+        
+        for i, job_info in enumerate(jobs_to_create):
+            template = job_info["template"]
+            
+            # Calculate start time
+            if request.start_time:
+                start = request.start_time + timedelta(minutes=i * interval_minutes)
+            else:
+                start = now + timedelta(minutes=i * interval_minutes)
+            
+            # Create job
+            job = ScrapeJob(
+                query=template.query,
+                country=job_info["country"],
+                scraper_type=template.scraper_type,
+                status="scheduled",
+                schedule_type="recurring",
+                frequency=template.frequency,
+                next_run_at=start,
+                is_active=True,
+                layer2_mode=template.preferred_layer2 if template.preferred_layer2 != "auto" else None,
+                config_snapshot=json.dumps({
+                    "template_id": template.id,
+                    "template_name": template.name,
+                    "run_number": job_info["run"],
+                    "priority": template.priority,
+                }),
+            )
+            session.add(job)
+            jobs_created.append({
+                "query": template.query[:50],
+                "country": job_info["country"],
+                "scheduled_at": start.isoformat(),
+            })
+        
+        # Update stats
+        stats.prompts_scheduled += len(jobs_created)
+        stats.quota_remaining = stats.daily_quota - stats.prompts_scheduled - stats.prompts_completed
+        session.add(stats)
+        session.commit()
+        
+        return {
+            "scheduled": len(jobs_created),
+            "quota_remaining": stats.quota_remaining,
+            "first_job_at": jobs_created[0]["scheduled_at"] if jobs_created else None,
+            "last_job_at": jobs_created[-1]["scheduled_at"] if jobs_created else None,
+            "jobs": jobs_created[:20],  # Show first 20
+            "message": f"Scheduled {len(jobs_created)} jobs across {len(set(j['country'] for j in jobs_created))} countries",
+        }
+
+
+@app.get(
+    "/api/cost-estimate",
+    tags=["analytics"],
+    summary="Estimate daily costs",
+    description="""
+    Estimate costs for running prompts with different configurations.
+    
+    Cost breakdown:
+    - VPN Direct: Free (after VPN subscription)
+    - Residential: ~$8.40/GB (~$0.004 per request @ 500KB)
+    - Unlocker: ~$3-10/1000 requests ($0.003-0.01 per request)
+    - Browser: ~$0.01-0.03 per request
+    """,
+)
+def estimate_costs(
+    prompts: int = 100,
+    countries: int = 3,
+    runs_per_prompt: int = 3,
+    scraper_type: str = "google_ai",
+):
+    """Estimate daily costs for different configurations."""
+    total_jobs = prompts * runs_per_prompt
+    jobs_per_country = total_jobs / countries
+    
+    # Cost per request by layer
+    costs = {
+        "direct": 0.0,  # Free
+        "residential": 0.004,  # ~$8.40/GB @ 500KB avg
+        "unlocker": 0.008,  # ~$8/1000 for Google
+        "browser": 0.025,  # ~$0.025 avg
+    }
+    
+    # Recommended layer by scraper
+    recommended = {
+        "google_ai": "unlocker",
+        "chatgpt": "browser",
+        "perplexity": "browser",
+    }
+    
+    rec_layer = recommended.get(scraper_type, "direct")
+    rec_cost = costs[rec_layer]
+    
+    return {
+        "configuration": {
+            "prompts": prompts,
+            "countries": countries,
+            "runs_per_prompt": runs_per_prompt,
+            "total_jobs": total_jobs,
+            "jobs_per_country": jobs_per_country,
+            "scraper_type": scraper_type,
+        },
+        "recommended": {
+            "layer": rec_layer,
+            "cost_per_request": rec_cost,
+            "daily_cost": round(total_jobs * rec_cost, 2),
+            "monthly_cost": round(total_jobs * rec_cost * 30, 2),
+        },
+        "alternatives": {
+            "vpn_direct": {
+                "cost_per_request": 0,
+                "daily_cost": 0,
+                "monthly_cost": 0,
+                "success_rate": "~70% (may hit CAPTCHA)",
+            },
+            "residential": {
+                "cost_per_request": costs["residential"],
+                "daily_cost": round(total_jobs * costs["residential"], 2),
+                "monthly_cost": round(total_jobs * costs["residential"] * 30, 2),
+                "success_rate": "~85%",
+            },
+            "unlocker": {
+                "cost_per_request": costs["unlocker"],
+                "daily_cost": round(total_jobs * costs["unlocker"], 2),
+                "monthly_cost": round(total_jobs * costs["unlocker"] * 30, 2),
+                "success_rate": "~95%",
+            },
+            "browser": {
+                "cost_per_request": costs["browser"],
+                "daily_cost": round(total_jobs * costs["browser"], 2),
+                "monthly_cost": round(total_jobs * costs["browser"] * 30, 2),
+                "success_rate": "~98%",
+            },
+        },
+        "optimization_tips": [
+            "Use VPN Direct for simple sites (free)",
+            "Use Unlocker for Google (~$0.008/req, 95% success)",
+            "Use Browser only for ChatGPT/Perplexity (~$0.025/req)",
+            "Run low-priority prompts at night (lower traffic)",
+            "Batch similar queries to reduce overhead",
+        ],
+    }
+
+
+@app.put(
+    "/api/daily-quota",
+    tags=["analytics"],
+    summary="Update daily quota",
+    description="Update the daily prompt quota.",
+)
+def update_daily_quota(quota: int = 100):
+    """Update daily quota."""
+    with Session(engine) as session:
+        today = datetime.utcnow().strftime("%Y-%m-%d")
+        stats = get_or_create_daily_stats(session, today)
+        stats.daily_quota = quota
+        stats.quota_remaining = quota - stats.prompts_completed - stats.prompts_scheduled
+        session.add(stats)
+        session.commit()
+        
+        return {
+            "daily_quota": quota,
+            "quota_remaining": stats.quota_remaining,
+            "prompts_used": stats.prompts_completed + stats.prompts_scheduled,
+        }
+
+
+# =============================================================================
+# API REFERENCE & DOCUMENTATION
+# =============================================================================
+
+@app.get(
+    "/api/reference",
+    tags=["documentation"],
+    summary="API Reference",
+    description="Complete API reference with all options and examples.",
+)
+def get_api_reference():
+    """Get complete API reference."""
+    return {
+        "overview": {
+            "description": "AISEO Scraping API with geo-targeted VPN routing",
+            "architecture": {
+                "layer1": "VPN (ProtonVPN per country) - Always active",
+                "layer2": "Optional proxy enhancement (direct/residential/unlocker/browser)",
+            },
+            "flow": "Client → VPN-{country} → Layer2 → Target Website",
+        },
+        "supported_options": {
+            "countries": {
+                "description": "VPN exit countries",
+                "options": SUPPORTED_VPN_COUNTRIES,
+                "example": "it,ch,uk",
+                "note": "Each country has its own VPN container (vpn-it, vpn-ch, etc.)",
+            },
+            "scraper_types": {
+                "description": "Target websites to scrape",
+                "options": {
+                    "google_ai": {
+                        "description": "Google AI Mode (AI-generated answers)",
+                        "recommended_layer2": "unlocker",
+                        "success_rate": "~95%",
+                    },
+                    "chatgpt": {
+                        "description": "ChatGPT (requires browser automation)",
+                        "recommended_layer2": "browser",
+                        "success_rate": "~98%",
+                    },
+                    "perplexity": {
+                        "description": "Perplexity AI search",
+                        "recommended_layer2": "browser",
+                        "success_rate": "~98%",
+                    },
+                },
+            },
+            "layer2_modes": {
+                "description": "Proxy layer on top of VPN",
+                "options": {
+                    "auto": {
+                        "description": "Auto-select based on scraper_type",
+                        "cost": "Varies",
+                    },
+                    "direct": {
+                        "description": "VPN only, no additional proxy",
+                        "cost": "$0.00/request",
+                        "success_rate": "~70%",
+                        "best_for": "Simple sites, testing",
+                    },
+                    "residential": {
+                        "description": "VPN + Bright Data residential IP",
+                        "cost": "~$0.004/request",
+                        "success_rate": "~85%",
+                        "best_for": "Sites blocking datacenter IPs",
+                    },
+                    "unlocker": {
+                        "description": "VPN + Web Unlocker with CAPTCHA solving",
+                        "cost": "~$0.008/request",
+                        "success_rate": "~95%",
+                        "best_for": "Google, protected sites",
+                    },
+                    "browser": {
+                        "description": "VPN + Cloud browser automation",
+                        "cost": "~$0.025/request",
+                        "success_rate": "~98%",
+                        "best_for": "ChatGPT, JavaScript-heavy sites",
+                    },
+                },
+            },
+            "frequencies": {
+                "description": "How often to run scheduled jobs",
+                "options": {
+                    "hourly": {"interval": "1 hour", "runs_per_day": 24},
+                    "2_per_day": {"interval": "12 hours", "runs_per_day": 2},
+                    "1_per_day": {"interval": "24 hours", "runs_per_day": 1},
+                    "daily": {"interval": "24 hours", "runs_per_day": 1},
+                    "2_per_week": {"interval": "3.5 days", "runs_per_day": 0.29},
+                    "weekly": {"interval": "7 days", "runs_per_day": 0.14},
+                    "monthly": {"interval": "30 days", "runs_per_day": 0.03},
+                },
+            },
+        },
+        "tracking_fields": {
+            "description": "Fields tracked for each job execution",
+            "fields": {
+                "country": "Target country code (e.g., 'it')",
+                "origin_ip": "Actual IP address used",
+                "origin_country": "Actual country of the IP",
+                "origin_verified": "True if origin matches target country",
+                "layer2_mode": "Which Layer 2 mode was used",
+                "duration_seconds": "Time to complete the job",
+                "response_size_kb": "Size of response in KB",
+                "estimated_cost_usd": "Estimated cost for this job",
+                "status": "pending/running/completed/failed/scheduled",
+            },
+        },
+        "endpoints": {
+            "templates": {
+                "POST /api/templates": {
+                    "description": "Create a prompt template",
+                    "example": {
+                        "name": "SEO Competition",
+                        "query": "best e-commerce platform comparison",
+                        "countries": "it,ch,uk",
+                        "scraper_type": "google_ai",
+                        "frequency": "1_per_day",
+                        "preferred_layer2": "unlocker",
+                    },
+                },
+                "GET /api/templates": "List all templates with routing info",
+            },
+            "scheduling": {
+                "POST /api/schedule-batch": "Schedule batch of prompts from templates",
+                "GET /api/scheduled-jobs": "List active scheduled jobs",
+                "GET /api/scheduler-status": "Scheduler health and upcoming jobs",
+            },
+            "monitoring": {
+                "GET /api/daily-stats": "Today's statistics, quota, and costs",
+                "GET /api/active-sessions": "Currently running jobs",
+                "GET /api/job-history": "Recent job execution history",
+                "GET /api/cost-estimate": "Estimate costs for a configuration",
+            },
+            "scraping": {
+                "POST /api/jobs/scrape": "Create and run a scrape job",
+                "GET /api/jobs/{job_id}": "Get job details and results",
+            },
+        },
+        "examples": {
+            "100_prompts_3_countries": {
+                "description": "Run 100 prompts daily across IT, CH, UK",
+                "setup": [
+                    "1. Create templates for your queries",
+                    "2. Set countries='it,ch,uk' on each template",
+                    "3. Use frequency='1_per_day' for daily runs",
+                    "4. Schedule batch to spread throughout day",
+                ],
+                "cost_estimate": {
+                    "total_jobs": "100 prompts × 3 countries = 300 jobs/day",
+                    "with_unlocker": "$2.40/day, $72/month",
+                    "with_browser": "$7.50/day, $225/month",
+                },
+            },
+        },
+    }

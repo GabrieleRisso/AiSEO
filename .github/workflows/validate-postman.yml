@@ -1,0 +1,71 @@
+name: Validate Postman Collection
+
+on:
+  push:
+    paths:
+      - 'postman/**'
+      - '.github/workflows/validate-postman.yml'
+  pull_request:
+    paths:
+      - 'postman/**'
+      - '.github/workflows/validate-postman.yml'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Validate Postman Collection
+        run: |
+          cd postman
+          chmod +x validate.sh
+          ./validate.sh
+
+      - name: Check collection structure
+        run: |
+          cd postman
+          python3 << 'EOF'
+          import json
+          import sys
+
+          with open('AiSEO_API.postman_collection.json', 'r') as f:
+              collection = json.load(f)
+
+          # Count endpoints
+          def count_items(items, count=0):
+              for item in items:
+                  if 'item' in item:
+                      count = count_items(item['item'], count)
+                  else:
+                      count += 1
+              return count
+
+          total_endpoints = count_items(collection['item'])
+          print(f"✓ Found {total_endpoints} endpoints in collection")
+
+          # Check for test scripts
+          def has_tests(items, count=0):
+              for item in items:
+                  if 'item' in item:
+                      count = has_tests(item['item'], count)
+                  elif 'event' in item:
+                      for event in item['event']:
+                          if event.get('listen') == 'test':
+                              count += 1
+              return count
+
+          test_count = has_tests(collection['item'])
+          print(f"✓ Found {test_count} requests with tests")
+
+          if total_endpoints < 5:
+              print("⚠ Warning: Collection seems small")
+          else:
+              print("✓ Collection size looks good")
+          EOF

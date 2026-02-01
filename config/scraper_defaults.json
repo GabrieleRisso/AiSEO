@@ -151,11 +151,40 @@
   },
   
   "chatgpt": {
-    "status": "experimental",
-    "description": "ChatGPT scraper - requires authentication handling",
+    "status": "working",
+    "description": "ChatGPT scraper using Bright Data Scraping Browser with CAPTCHA bypass",
+    "recommended_settings": {
+      "use_scraping_browser": true,
+      "take_screenshot": true,
+      "profile": "desktop_1080p"
+    },
+    "profile_recommendations": {
+      "desktop_view": "desktop_1080p",
+      "mobile_view": "iphone_14",
+      "tablet_view": "ipad_air"
+    },
+    "geolocation": {
+      "description": "Country is set via -country-{code} flag in Bright Data endpoint",
+      "verification": {
+        "method": "JavaScript fetch to ipinfo.io",
+        "logged_fields": ["ip", "country", "city", "region"]
+      }
+    },
+    "screenshot_policy": {
+      "on_success": "final_only",
+      "on_error": "always"
+    },
+    "network_chain_logging": {
+      "layer_1": "VPN (ProtonVPN via Gluetun)",
+      "layer_2": "Bright Data Scraping Browser",
+      "layer_3": "Device Profile"
+    },
     "notes": [
-      "ChatGPT requires login for full access",
-      "Consider using OpenAI API instead for reliability"
+      "Scraping Browser handles CAPTCHA automatically",
+      "Login prompts are dismissed automatically",
+      "Supports phone/tablet/desktop profiles",
+      "Best results with desktop profile for full content",
+      "ChatGPT may require login for extended conversations"
     ]
   },
   
