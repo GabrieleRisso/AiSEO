@@ -1,99 +1,72 @@
-# AISEO Development Roadmap
+# AISEO Roadmap
 
-## Vision
-Track brand visibility across AI-powered search engines (Google AI, ChatGPT, Perplexity) to optimize SEO strategies for the AI era.
+## Live Platform
 
----
+| Service | URL | Status |
+|---------|-----|--------|
+| Frontend | app.tokenspender.com | ✅ Live |
+| Backend API | api.tokenspender.com | ✅ Live |
+| Admin | admin.tokenspender.com | ✅ Live |
+| Scraper | scraper.tokenspender.com:5000 | ✅ Hetzner |
+| Docs | docs.tokenspender.com | ✅ Live |
 
-## Current Status (Feb 2026)
+## Current Focus (Feb 2026)
 
 ### ✅ Completed
-- Multi-scraper architecture (Google AI, ChatGPT)
-- VPN integration (ProtonVPN)
-- Browser mode automation
-- UK market scraping
-- Brand mention tracking
-- SQLite database storage
-- FastAPI backend
-- React dashboard (basic)
+- Multi-scraper: Google AI, ChatGPT, Perplexity
+- 8 VPN countries: IT, UK, FR, DE, ES, NL, CH, SE
+- 4 proxy layers: direct, residential, unlocker, browser
+- Brand tracking: 17 brands monitored
+- Mobile scraping: Pixel 7, iPhone profiles
 
-### 🔄 In Progress
-- Italy market expansion
-- Multi-language support
-- Improved data visualization
+### 🔄 Active
+- Italy market daily scraping (browser + mobile)
+- Automated commits via Cyberdeck/OpenClaw
+- Job scheduler: daily runs at 3 AM CET
 
----
+## Weekly Dev (Cyberdeck)
 
-## Weekly Development Timeline
+**Mon/Wed/Fri @ 20:00 CET** - Auto-commit cycle:
+1. Pull latest from origin
+2. Pick ONE task from backlog
+3. Implement & test
+4. Update CHANGELOG.md
+5. Commit with `[auto]` tag
+6. Push
 
-### Week 6 (Feb 3-9, 2026) - Italy Launch
-- [x] Italy scraper setup (browser mode)
-- [x] Italian query localization
-- [ ] Italy dashboard view
-- [ ] Country comparison charts
+### Backlog (Priority Order)
+1. [ ] Brand visibility trends chart
+2. [ ] Export to CSV
+3. [ ] Email digest reports
+4. [ ] Perplexity scraper improvements
+5. [ ] Multi-country comparison view
+6. [ ] API rate limiting
+7. [ ] User authentication
 
-### Week 7 (Feb 10-16, 2026) - Analytics
-- [ ] Brand visibility trends over time
-- [ ] Source citation analysis
-- [ ] Competitor tracking
-- [ ] Export to CSV/Excel
+## API Quick Reference
 
-### Week 8 (Feb 17-23, 2026) - Frontend
-- [ ] Improved dashboard UI
-- [ ] Real-time job status
-- [ ] Filter by country/scraper
-- [ ] Mobile responsive design
+```bash
+# Create scrape job
+curl -X POST https://api.tokenspender.com/api/jobs/scrape \
+  -H "Content-Type: application/json" \
+  -d '{"query":"best ecommerce platform","country":"it","proxy_layer":"browser","profile":"pixel_7"}'
 
-### Week 9 (Feb 24 - Mar 2, 2026) - Scrapers
-- [ ] Perplexity scraper
-- [ ] Bing Copilot scraper
-- [ ] Claude.ai scraper
-- [ ] Rate limiting optimization
+# Check stats
+curl https://api.tokenspender.com/api/stats/database
 
-### Week 10 (Mar 3-9, 2026) - API
-- [ ] Public API endpoints
-- [ ] API key authentication
-- [ ] Webhook notifications
-- [ ] Scheduled reports
+# List jobs
+curl https://api.tokenspender.com/api/jobs?limit=10
+```
 
----
+## Costs
 
-## Backlog
-
-### High Priority
-- Multi-country support (DE, FR, ES)
-- Historical data retention
-- Automated insights generation
-- Email digest reports
-
-### Medium Priority
-- User authentication
-- Team workspaces
-- Custom query sets
-- Brand aliases
-
-### Low Priority
-- Mobile app
-- Browser extension
-- Slack integration
-- White-label option
+| Service | Monthly |
+|---------|---------|
+| Railway | ~$5-15 |
+| Hetzner VPS | €4.51 |
+| Bright Data | ~$5-10 |
+| **Total** | **~$15-30** |
 
 ---
 
-## Tech Stack
-- **Backend**: FastAPI, SQLModel, SQLite
-- **Frontend**: React, Vite, TailwindCSS
-- **Scraping**: undetected-chromedriver, Playwright
-- **Infrastructure**: Railway, Docker
-- **Automation**: OpenClaw (Cyberdeck)
-
----
-
-## Contributing
-
-Automated commits by **Cyberdeck** (OpenClaw AI) on Mon/Wed/Fri.
-Manual development by team as needed.
-
----
-
-*Last updated: 2026-02-03 by Cyberdeck*
+*Automated by Cyberdeck (OpenClaw) | GabrieleRisso*
